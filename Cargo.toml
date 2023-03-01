@@ -9,4 +9,5 @@ edition = "2021"
 [dependencies]
 gtk = "0.17.0"
 gl  = "0.14"
-rex = {git = "https://github.com/KenyC/ReX"}
+rex = {git = "https://github.com/KenyC/ReX", features = ["ttfparser-backend"]}
+ttf-parser = "*"
