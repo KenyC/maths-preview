@@ -1,0 +1,12 @@
+[package]
+name = "maths_preview"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+
+[dependencies]
+gtk = "0.17.0"
+gl  = "0.14"
+rex = {git = "https://github.com/KenyC/ReX"}
