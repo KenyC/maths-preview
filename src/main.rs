@@ -1,12 +1,13 @@
-use std::cell::Cell;
+use std::cell::RefCell;
 use std::rc::Rc;
 
 use gtk::cairo::Context;
-use gtk::gdk::keys::Key;
-use gtk::gdk::{key, EventKey};
+
+
 use gtk::glib::clone;
 use gtk::{prelude::*, TextView, DrawingArea, glib};
-use gtk::{Application, ApplicationWindow, Button};
+use gtk::{Application, ApplicationWindow};
+use rex::layout::Grid;
 use rex::{Renderer, GraphicsBackend, FontBackend, Backend};
 use rex::font::FontContext;
 use rex::font::backend::ttf_parser::TtfMathFont;
@@ -17,6 +18,10 @@ const EXAMPLE_FORMULA : &str = r"\iint \sqrt{1 + f^2(x,t,t)}\,\mathrm{d}x\mathrm
 
 
 fn main() {
+    // TODO: find a more elegant way to deal with lifetimes
+    // The lifetime in TtfMathFont & the requirement that the closures fed in GTK are 'static come in conflict
+    // We leak the memory of the box so as to get a 'static reference
+    // This is technically ok, because we only leak once 
     let math_font_file = Box::leak(std::fs::read("resources/rex-xits.otf").unwrap().into_boxed_slice());
     let font = Rc::new(load_font(math_font_file));
 
@@ -33,12 +38,10 @@ fn main() {
 fn build_ui(app : &Application, font : Rc<TtfMathFont<'static>>) {
     let window = ApplicationWindow::builder()
         .application(app)
-        .title("First GTK Program")
+        .title("Math Preview")
         .default_width(350)
         .default_height(70)
         .build();
-
-    let mut color = Rc::new(Cell::new(0.5));
 
 
 
@@ -52,26 +55,43 @@ fn build_ui(app : &Application, font : Rc<TtfMathFont<'static>>) {
         .build()
     ;
 
-    // let new_color = color.clone();
-    draw_area.connect_draw(clone!(@strong color, @strong font => move |area, context| {
-        // context.set_source_rgb(color.get(), 0.0, 0.0);
-        // context.rectangle(0., 0., 50., 50.);
-        // context.fill().unwrap();
-        draw_formula(EXAMPLE_FORMULA, context, font.clone(), area.allocated_width() as f64);
+    let text_buffer = text_field.buffer().unwrap();
+    text_buffer.set_text(EXAMPLE_FORMULA);
+
+    let last_ok_string = Rc::new(RefCell::new(EXAMPLE_FORMULA.to_string()));
+
+    draw_area.connect_draw(clone!(@strong font, @strong text_buffer, @strong last_ok_string => move |area, context| {
+        context.set_source_rgb(0.0, 0.0, 0.0);
+
+        if let Some(text) = text_buffer.text(&text_buffer.start_iter(), &text_buffer.end_iter(), false) {
+            let width  = area.allocated_width()  as f64;
+            let height = area.allocated_height() as f64; 
+            dbg!(
+                &text,
+                area.allocated_width()  as f64,
+                area.allocated_height() as f64,
+            );
+
+            let result = draw_formula(text.as_str(), context, font.clone(), width, height);
+            if result.is_some() {
+                let mut str_ref = last_ok_string.borrow_mut();
+                str_ref.clear();
+                str_ref.push_str(text.as_str());
+            }
+            else {
+                println!("error!");
+                draw_formula(last_ok_string.borrow().as_str(), context, font.clone(), width, height);
+            }
+        }
         Inhibit(false)
     }));
 
 
-    let button = Button::with_label("Click me!");
-    button.connect_clicked(clone!(@weak color, @weak draw_area => move |_| {
-        color.set(1.0);
-        draw_area.queue_draw();
-        eprintln!("Clicked!");
+
+    text_buffer.connect_changed(clone!(@weak draw_area => move |_text_buffer| {
+        draw_area.queue_draw()
     }));
 
-
-    let text_buffer = text_field.buffer().unwrap();
-    text_buffer.set_text("\\frac{1}{2}");
 
 
     let vbox = gtk::Box::builder()
@@ -80,7 +100,6 @@ fn build_ui(app : &Application, font : Rc<TtfMathFont<'static>>) {
     ;
 
     vbox.add(&draw_area);
-    vbox.add(&button);
     vbox.add(&text_field);
     window.add(&vbox);
 
@@ -98,35 +117,69 @@ fn build_ui(app : &Application, font : Rc<TtfMathFont<'static>>) {
 
 
 
-fn draw_formula<'a>(formula : &str, context: &Context, font : Rc<TtfMathFont<'a>>, canvas_width : f64) {
-    let font_context = FontContext::new(font.as_ref()).unwrap();
-    let parse_node = parse(formula).unwrap();
+fn draw_formula<'a>(formula : &str, context: &Context, font : Rc<TtfMathFont<'a>>, canvas_width : f64, canvas_height : f64) -> Option<()> {
+    let font_context = FontContext::new(font.as_ref()).ok()?;
+    let parse_node = parse(formula).ok()?;
     let layout_settings = rex::layout::LayoutSettings::new(&font_context, 10.0, rex::layout::Style::Display);
-    let node = rex::layout::engine::layout(&parse_node, layout_settings).unwrap();
+    let node = rex::layout::engine::layout(&parse_node, layout_settings).ok()?;
+
+    // TODO : using the node directly results in an incorrect estimation of height and width of the formula
+    // A problem in downstream ReX?
+    let mut grid = Grid::new();
+    grid.insert(0, 0, node.as_node());
+    let mut layout = rex::layout::Layout::new();
+    layout.add_node(grid.build());
+
 
     let renderer = Renderer::new();
 
-    let (x0, y0, x1, y1) = renderer.size(&node);
-    let width   = x1 - x0;
-    let height  = y1 - y0;
-    context.save();
-    context.translate(x0, y0);
-    let min_scale = canvas_width / width;
-    context.scale(min_scale, min_scale);
-    context.translate(0., height);
-
-    // let context = context.clone();
-    // context.set_source_rgb(1., 0., 0.);
-    // context.rectangle(10., 10., 10., 10.);
-    // context.fill().unwrap();
+    // let (x0, y0, x1, y1) = renderer.size(&node);
+    context.save().ok()?;
+    let formula_bbox = renderer.size(&layout);
+    scale_and_center(formula_bbox, context, (canvas_width, canvas_height));
 
     let mut backend = CairoBackend(context.clone());
-    renderer.render(&node, &mut backend);
+    renderer.render(&layout, &mut backend);
 
+
+
+    context.restore().ok()?;
+    Some(())
+}
+
+fn scale_and_center(bbox: (f64, f64, f64, f64), context: &Context, canvas_size: (f64, f64)) {
+    let (x0, y0, x1, y1) = bbox;
+    let (canvas_width, canvas_height) = canvas_size;
+    let width   = x1 - x0;
+    let height  = y1 - y0;
+    let midx = 0.5 * (x0 + x1);
+    let midy = 0.5 * (y0 + y1);
+
+    let fit_to_width  = canvas_width / width;
+    let fit_to_height = canvas_height / height;
+    let scale = f64::min(fit_to_width, fit_to_height);
+
+    let tx = - (midx - 0.5 *  canvas_width / scale);
+    let ty = - (midy - 0.5 *  canvas_height / scale);
+    context.scale(scale, scale);
+    context.translate(tx, ty);
+
+    // draw_bbox(context, x0, y0, width, height, x1, y1);
+}
+
+fn draw_bbox(context: &Context, x0: f64, y0: f64, width: f64, height: f64, x1: f64, y1: f64) {
     context.set_source_rgb(1., 0., 0.);
     context.rectangle(x0, y0, width, height);
     context.stroke().unwrap();
-    context.restore();
+
+    context.set_source_rgb(0., 1., 0.);
+    const WIDTH_POINT : f64 = 5.;
+    context.rectangle(x0 - WIDTH_POINT * 0.5, y0 - WIDTH_POINT * 0.5, WIDTH_POINT, WIDTH_POINT);
+    context.fill().unwrap();
+
+    context.set_source_rgb(0., 1., 0.);
+    context.rectangle(x1 - WIDTH_POINT * 0.5, y1 - WIDTH_POINT * 0.5, WIDTH_POINT, WIDTH_POINT);
+    context.fill().unwrap();
 }
 
 fn load_font<'a>(file : &'a [u8]) -> TtfMathFont<'a> {
@@ -154,12 +207,14 @@ impl GraphicsBackend for CairoBackend {
         context.fill().unwrap();
     }
 
+
+    // We preliminary don't support color changes
     fn begin_color(&mut self, color: rex::RGBA) {
-        todo!()
+        unimplemented!()
     }
 
     fn end_color(&mut self) {
-        todo!()
+        unimplemented!()
     }
 }
 
@@ -172,7 +227,6 @@ impl<'a> FontBackend<TtfMathFont<'a>> for CairoBackend {
 
         context.save().unwrap();
         context.translate(pos.x, pos.y);
-        // context.scale(0.1, 0.1);
         context.scale(scale, -scale);
         context.scale(ctx.font_matrix().sx.into(), ctx.font_matrix().sy.into(),);
         context.set_fill_rule(gtk::cairo::FillRule::EvenOdd);
@@ -192,27 +246,27 @@ impl<'a> FontBackend<TtfMathFont<'a>> for CairoBackend {
 
         impl<'a> OutlineBuilder for Builder<'a> {
             fn move_to(&mut self, x: f32, y: f32) {
-                println!("move_to {:?} {:?}", x, y);
+                // println!("move_to {:?} {:?}", x, y);
                 self.context.move_to(x.into(), y.into());
             }
 
             fn line_to(&mut self, x: f32, y: f32) {
-                println!("line_to {:?} {:?}", x, y);
+                // println!("line_to {:?} {:?}", x, y);
                 self.context.line_to(x.into(), y.into());
             }
 
             fn quad_to(&mut self, x1: f32, y1: f32, x: f32, y: f32) {
-                println!("quad_to  {:?} {:?} {:?} {:?}", x1, y1, x, y);
+                // println!("quad_to  {:?} {:?} {:?} {:?}", x1, y1, x, y);
                 self.context.curve_to(x1.into(), y1.into(), x1.into(), y1.into(), x.into(), y.into(),)
             }
 
             fn curve_to(&mut self, x1: f32, y1: f32, x2: f32, y2: f32, x: f32, y: f32) {
-                println!("curve_to {:?} {:?} {:?} {:?} {:?} {:?}", x1, y1, x2, y2, x, y);
+                // println!("curve_to {:?} {:?} {:?} {:?} {:?} {:?}", x1, y1, x2, y2, x, y);
                 self.context.curve_to(x1.into(), y1.into(), x2.into(), y2.into(), x.into(), y.into(),)
             }
 
             fn close(&mut self) {
-                println!("close");
+                // println!("close");
                 self.context.close_path();
             }
 
@@ -224,8 +278,6 @@ impl<'a> FontBackend<TtfMathFont<'a>> for CairoBackend {
 
         ctx.font().outline_glyph(gid.into(), &mut builder);
         builder.fill();
-        // context.rectangle(0., 0., 10., 10.);
-        // context.fill().unwrap();
         context.restore().unwrap();
     }
 }
