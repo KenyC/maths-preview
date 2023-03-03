@@ -1,11 +1,12 @@
 use std::cell::RefCell;
+use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
 use gtk::cairo::Context;
 
 
 use gtk::glib::clone;
-use gtk::{prelude::*, TextView, DrawingArea, glib};
+use gtk::{prelude::*, TextView, DrawingArea, glib, Button};
 use gtk::{Application, ApplicationWindow};
 use rex::layout::Grid;
 use rex::{Renderer, GraphicsBackend, FontBackend, Backend};
@@ -13,21 +14,22 @@ use rex::font::FontContext;
 use rex::font::backend::ttf_parser::TtfMathFont;
 use rex::parser::parse;
 
-const EXAMPLE_FORMULA : &str = r"\iint \sqrt{1 + f^2(x,t,t)}\,\mathrm{d}x\mathrm{d}y\mathrm{d}t = \sum \xi(t)";
-// const EXAMPLE_FORMULA : &str = r"\left.x^{x^{x^x_x}_{x^x_x}}_{x^{x^x_x}_{x^x_x}}\right\} \mathrm{wat?}";
+// const EXAMPLE_FORMULA : &str = r"\iint \sqrt{1 + f^2(x,t,t)}\,\mathrm{d}x\mathrm{d}y\mathrm{d}t = \sum \xi(t)";
+const EXAMPLE_FORMULA : &str = r"\left.x^{x^{x^x_x}_{x^x_x}}_{x^{x^x_x}_{x^x_x}}\right\} \mathrm{wat?}";
 
+const SVG_PATH : &str = "example.svg";
 
 fn main() {
-    // TODO: find a more elegant way to deal with lifetimes
-    // The lifetime in TtfMathFont & the requirement that the closures fed in GTK are 'static come in conflict
-    // We leak the memory of the box so as to get a 'static reference
-    // This is technically ok, because we only leak once 
+    // TODO: find a more elegant way to deal with lifetimes.
+    // The lifetime in TtfMathFont & the requirement that closures fed to GTK are 'static come in conflict.
+    // We leak the memory of the box so as to get a 'static reference.
+    // This is ok, because we only leak once, but it's somewhat inelegant.
     let math_font_file = Box::leak(std::fs::read("resources/rex-xits.otf").unwrap().into_boxed_slice());
     let font = Rc::new(load_font(math_font_file));
 
 
     let application = Application::builder()
-        .application_id("com.example.FirstGtkApp")
+        .application_id("com.example.MathPreview")
         .build();
 
     application.connect_activate(clone!(@strong font => move |app| build_ui(app, font.clone())));
@@ -72,7 +74,7 @@ fn build_ui(app : &Application, font : Rc<TtfMathFont<'static>>) {
                 area.allocated_height() as f64,
             );
 
-            let result = draw_formula(text.as_str(), context, font.clone(), width, height);
+            let result = draw_formula(text.as_str(), context, font.clone(), Some((width, height)));
             if result.is_some() {
                 let mut str_ref = last_ok_string.borrow_mut();
                 str_ref.clear();
@@ -80,7 +82,7 @@ fn build_ui(app : &Application, font : Rc<TtfMathFont<'static>>) {
             }
             else {
                 println!("error!");
-                draw_formula(last_ok_string.borrow().as_str(), context, font.clone(), width, height);
+                draw_formula(last_ok_string.borrow().as_str(), context, font.clone(), Some((width, height)));
             }
         }
         Inhibit(false)
@@ -93,6 +95,12 @@ fn build_ui(app : &Application, font : Rc<TtfMathFont<'static>>) {
     }));
 
 
+    let button = Button::with_label("Save to SVG");
+    button.connect_clicked(clone!(@weak text_buffer, @strong text_buffer => move |_| {
+        if let Some(text) = text_buffer.text(&text_buffer.start_iter(), &text_buffer.end_iter(), false) {
+            let result = save_svg(Path::new(SVG_PATH), text.as_str(), font.clone(), (500., 200.));
+        }
+    }));
 
     let vbox = gtk::Box::builder()
         .orientation(gtk::Orientation::Vertical)
@@ -101,6 +109,7 @@ fn build_ui(app : &Application, font : Rc<TtfMathFont<'static>>) {
 
     vbox.add(&draw_area);
     vbox.add(&text_field);
+    vbox.add(&button);
     window.add(&vbox);
 
     window.connect_key_press_event(|window, key| {
@@ -115,9 +124,18 @@ fn build_ui(app : &Application, font : Rc<TtfMathFont<'static>>) {
 }
 
 
+fn save_svg(path : &Path, formula : &str, font : Rc<TtfMathFont>, canvas_size : (f64, f64),) -> Option<()> {
+    let (width, height) = canvas_size;
+    let svg_surface = gtk::cairo::SvgSurface::new(width, height, Some(path)).ok()?;
+    let context = Context::new(svg_surface).ok()?;
+
+    draw_formula(formula, &context, font, Some((width, height)))?;
+
+    Some(())
+}
 
 
-fn draw_formula<'a>(formula : &str, context: &Context, font : Rc<TtfMathFont<'a>>, canvas_width : f64, canvas_height : f64) -> Option<()> {
+fn draw_formula<'a>(formula : &str, context: &Context, font : Rc<TtfMathFont<'a>>, canvas_size : Option<(f64, f64)>,) -> Option<()> {
     let font_context = FontContext::new(font.as_ref()).ok()?;
     let parse_node = parse(formula).ok()?;
     let layout_settings = rex::layout::LayoutSettings::new(&font_context, 10.0, rex::layout::Style::Display);
@@ -135,8 +153,10 @@ fn draw_formula<'a>(formula : &str, context: &Context, font : Rc<TtfMathFont<'a>
 
     // let (x0, y0, x1, y1) = renderer.size(&node);
     context.save().ok()?;
-    let formula_bbox = renderer.size(&layout);
-    scale_and_center(formula_bbox, context, (canvas_width, canvas_height));
+    if let Some(canvas_size) = canvas_size {
+        let formula_bbox = renderer.size(&layout);
+        scale_and_center(formula_bbox, context, canvas_size);
+    }
 
     let mut backend = CairoBackend(context.clone());
     renderer.render(&layout, &mut backend);

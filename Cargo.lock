@@ -440,6 +440,7 @@ dependencies = [
 name = "maths_preview"
 version = "0.1.0"
 dependencies = [
+ "cairo-rs",
  "gl",
  "gtk",
  "rex",
