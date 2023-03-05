@@ -1,0 +1,4 @@
+{
+  "math_preview_exe_path": "~/bin/maths_preview",
+  "math_font":             "/usr/local/share/fonts/f/FiraMath_Regular.otf",
+}

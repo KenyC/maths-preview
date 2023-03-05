@@ -1,0 +1,5 @@
+{
+  "math_preview_exe_path": "~/bin/math_preview",
+  // To use a custom OpenType Math font
+  // "math_font": "/usr/local/share/fonts/r/rex_xits.otf",
+}

@@ -5,6 +5,7 @@ use std::rc::Rc;
 use gtk::cairo::Context;
 
 
+use gtk::gio::{SimpleAction, ApplicationFlags};
 use gtk::glib::clone;
 use gtk::{prelude::*, TextView, DrawingArea, glib, Button};
 use gtk::{Application, ApplicationWindow};
@@ -18,13 +19,21 @@ use rex::parser::parse;
 const EXAMPLE_FORMULA : &str = r"\left.x^{x^{x^x_x}_{x^x_x}}_{x^{x^x_x}_{x^x_x}}\right\} \mathrm{wat?}";
 
 const SVG_PATH : &str = "example.svg";
+const DEFAULT_FONT : &[u8] = include_bytes!("../resources/rex-xits.otf");
 
 fn main() {
+    let math_font_file : & 'static [u8]; 
+    if let Ok(font_path) = std::env::var("MATH_FONT") {
+        let font_bytes = std::fs::read(&font_path).unwrap();
+        math_font_file = Box::leak(font_bytes.into_boxed_slice());
+    }
+    else {
+        math_font_file = DEFAULT_FONT;
+    }
     // TODO: find a more elegant way to deal with lifetimes.
     // The lifetime in TtfMathFont & the requirement that closures fed to GTK are 'static come in conflict.
     // We leak the memory of the box so as to get a 'static reference.
     // This is ok, because we only leak once, but it's somewhat inelegant.
-    let math_font_file = Box::leak(std::fs::read("resources/rex-xits.otf").unwrap().into_boxed_slice());
     let font = Rc::new(load_font(math_font_file));
 
 
@@ -33,6 +42,16 @@ fn main() {
         .build();
 
     application.connect_activate(clone!(@strong font => move |app| build_ui(app, font.clone())));
+
+
+    let action_close = SimpleAction::new("quit", None);
+    action_close.connect_activate(clone!(@weak application => move |_, _| {
+        application.windows()[0].close();
+        // application.quit(); <- QUIT does not call delete window
+    }));
+    application.add_action(&action_close);
+    application.set_accels_for_action("app.quit", &["<Ctrl>Q", "Escape"]);
+    
 
     application.run();
 }
@@ -59,6 +78,8 @@ fn build_ui(app : &Application, font : Rc<TtfMathFont<'static>>) {
 
     let text_buffer = text_field.buffer().unwrap();
     text_buffer.set_text(EXAMPLE_FORMULA);
+    text_buffer.select_range(&text_buffer.start_iter(), &text_buffer.end_iter());
+    text_field.grab_focus();
 
     let last_ok_string = Rc::new(RefCell::new(EXAMPLE_FORMULA.to_string()));
 
@@ -81,7 +102,7 @@ fn build_ui(app : &Application, font : Rc<TtfMathFont<'static>>) {
                 str_ref.push_str(text.as_str());
             }
             else {
-                println!("error!");
+                eprintln!("error!");
                 draw_formula(last_ok_string.borrow().as_str(), context, font.clone(), Some((width, height)));
             }
         }
@@ -107,17 +128,19 @@ fn build_ui(app : &Application, font : Rc<TtfMathFont<'static>>) {
         .build()
     ;
 
+
     vbox.add(&draw_area);
     vbox.add(&text_field);
     vbox.add(&button);
     window.add(&vbox);
 
-    window.connect_key_press_event(|window, key| {
-        if key.keyval() == gtk::gdk::keys::constants::Escape {
-            window.application().unwrap().quit();
+    window.connect_delete_event(clone!(@strong text_buffer => move |_, _| {
+        dbg!("BHDT");
+        if let Some(text) = text_buffer.text(&text_buffer.start_iter(), &text_buffer.end_iter(), false) {
+            println!("{}", text);
         }
         Inhibit(false)
-    });
+    }));
 
     window.show_all();
     
@@ -266,27 +289,27 @@ impl<'a> FontBackend<TtfMathFont<'a>> for CairoBackend {
 
         impl<'a> OutlineBuilder for Builder<'a> {
             fn move_to(&mut self, x: f32, y: f32) {
-                // println!("move_to {:?} {:?}", x, y);
+                // eprintln!("move_to {:?} {:?}", x, y);
                 self.context.move_to(x.into(), y.into());
             }
 
             fn line_to(&mut self, x: f32, y: f32) {
-                // println!("line_to {:?} {:?}", x, y);
+                // eprintln!("line_to {:?} {:?}", x, y);
                 self.context.line_to(x.into(), y.into());
             }
 
             fn quad_to(&mut self, x1: f32, y1: f32, x: f32, y: f32) {
-                // println!("quad_to  {:?} {:?} {:?} {:?}", x1, y1, x, y);
+                // eprintln!("quad_to  {:?} {:?} {:?} {:?}", x1, y1, x, y);
                 self.context.curve_to(x1.into(), y1.into(), x1.into(), y1.into(), x.into(), y.into(),)
             }
 
             fn curve_to(&mut self, x1: f32, y1: f32, x2: f32, y2: f32, x: f32, y: f32) {
-                // println!("curve_to {:?} {:?} {:?} {:?} {:?} {:?}", x1, y1, x2, y2, x, y);
+                // eprintln!("curve_to {:?} {:?} {:?} {:?} {:?} {:?}", x1, y1, x2, y2, x, y);
                 self.context.curve_to(x1.into(), y1.into(), x2.into(), y2.into(), x.into(), y.into(),)
             }
 
             fn close(&mut self) {
-                // println!("close");
+                // eprintln!("close");
                 self.context.close_path();
             }
 
