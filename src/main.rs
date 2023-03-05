@@ -7,6 +7,7 @@ use gtk::cairo::Context;
 
 use gtk::gio::{SimpleAction, ApplicationFlags};
 use gtk::glib::clone;
+use gtk::subclass::scrolled_window;
 use gtk::{prelude::*, TextView, DrawingArea, glib, Button};
 use gtk::{Application, ApplicationWindow};
 use rex::layout::Grid;
@@ -125,17 +126,23 @@ fn build_ui(app : &Application, font : Rc<TtfMathFont<'static>>) {
 
     let vbox = gtk::Box::builder()
         .orientation(gtk::Orientation::Vertical)
+        .spacing(3)
+        .margin(10)
         .build()
     ;
 
+    let scrolled_window = gtk::ScrolledWindow::builder()
+        .build()
+    ;
+    scrolled_window.add(&text_field);
+    // \oint_C \vec{E} \cdot \mathrm{d} \vec \ell= - \frac{\mathrm{d}}{\mathrm{d}t} \left( \int_S \vec{B}\cdot\mathrm{d} \vec{S} \right)
 
     vbox.add(&draw_area);
-    vbox.add(&text_field);
+    vbox.add(&scrolled_window);
     vbox.add(&button);
     window.add(&vbox);
 
     window.connect_delete_event(clone!(@strong text_buffer => move |_, _| {
-        dbg!("BHDT");
         if let Some(text) = text_buffer.text(&text_buffer.start_iter(), &text_buffer.end_iter(), false) {
             println!("{}", text);
         }
