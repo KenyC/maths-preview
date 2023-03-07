@@ -1,7 +1,10 @@
-use std::cell::RefCell;
+use std::cell::{RefCell, Cell};
+use std::io::Write;
+use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
+use cairo::glib::{VariantTy, VariantDict};
 use gtk::cairo::Context;
 
 
@@ -22,27 +25,94 @@ const EXAMPLE_FORMULA : &str = r"\left.x^{x^{x^x_x}_{x^x_x}}_{x^{x^x_x}_{x^x_x}}
 const SVG_PATH : &str = "example.svg";
 const DEFAULT_FONT : &[u8] = include_bytes!("../resources/rex-xits.otf");
 
+
+#[derive(Debug, Clone, Copy)]
+enum Format {
+    Svg, 
+    Tex,
+}
+
+impl Default for Format {
+    fn default() -> Self 
+    { Self::Tex }
+}
+
+
+#[derive(Debug,)]
+enum Output {
+    Stdout,
+    Path(PathBuf),
+}
+
+impl Output {
+    fn stream(&self) -> std::io::Result<Box<dyn Write + 'static>> {
+        match self {
+            Output::Stdout     => Ok(Box::new(std::io::stdout())),
+            Output::Path(path) => Ok(Box::new(std::fs::File::open(path)?)),
+        }
+    } 
+}
+
+impl Default for Output {
+    fn default() -> Self { Self::Stdout }
+}
+
+
+
+
 fn main() {
-    let math_font_file : & 'static [u8]; 
-    if let Ok(font_path) = std::env::var("MATH_FONT") {
-        let font_bytes = std::fs::read(&font_path).unwrap();
-        math_font_file = Box::leak(font_bytes.into_boxed_slice());
-    }
-    else {
-        math_font_file = DEFAULT_FONT;
-    }
-    // TODO: find a more elegant way to deal with lifetimes.
-    // The lifetime in TtfMathFont & the requirement that closures fed to GTK are 'static come in conflict.
-    // We leak the memory of the box so as to get a 'static reference.
-    // This is ok, because we only leak once, but it's somewhat inelegant.
-    let font = Rc::new(load_font(math_font_file));
+    let math_font_file : Rc<Cell<& 'static [u8]>> = Rc::new(Cell::new(DEFAULT_FONT)); 
+    let format         : Rc<Cell<Format>> = Rc::new(Cell::default()); 
+    let outfile : Rc<RefCell<Output>> = Rc::new(RefCell::default());
 
 
     let application = Application::builder()
         .application_id("com.example.MathPreview")
         .build();
 
-    application.connect_activate(clone!(@strong font => move |app| build_ui(app, font.clone())));
+    application.add_main_option(
+        "mathfont", 
+        gtk::glib::Char(b'm' as i8), 
+        gtk::glib::OptionFlags::IN_MAIN & gtk::glib::OptionFlags::OPTIONAL_ARG, 
+        gtk::glib::OptionArg::Filename, 
+        "The OpenType maths font to use for render", 
+        None,
+    );
+
+    application.add_main_option(
+        "outfile", 
+        gtk::glib::Char(b'o' as i8), 
+        gtk::glib::OptionFlags::IN_MAIN & gtk::glib::OptionFlags::OPTIONAL_ARG, 
+        gtk::glib::OptionArg::Filename, 
+        "Output file ; if left unspecified, output is directed to stdout", 
+        None,
+    );
+
+    application.add_main_option(
+        "format",
+        gtk::glib::Char(b'f' as i8),
+        gtk::glib::OptionFlags::IN_MAIN & gtk::glib::OptionFlags::OPTIONAL_ARG, 
+        gtk::glib::OptionArg::String, 
+        "Format of 'outfile' ('svg', 'tex') ; defaults to 'tex'", 
+        None,
+    );
+
+
+
+    application.connect_handle_local_options(clone!(@strong math_font_file, @strong outfile, @strong format, => move |_application, option| {
+        if let Some(font_file) = parse_path(option) {
+            math_font_file.set(font_file);
+        }
+        *outfile.borrow_mut() = parse_outfile(option);
+        if let Some(option_format) = parse_format(option) {
+            format.set(option_format);
+        } 
+        -1
+    }));
+    application.connect_activate(clone!(@strong outfile => move |app| 
+        build_ui(app, load_font(math_font_file.get()), format.get(), outfile.clone())
+    ));
+
 
 
     let action_close = SimpleAction::new("quit", None);
@@ -57,7 +127,40 @@ fn main() {
     application.run();
 }
 
-fn build_ui(app : &Application, font : Rc<TtfMathFont<'static>>) {
+fn parse_path(option : &VariantDict) -> Option<& 'static [u8]> {
+    let mathfont = option.lookup_value("mathfont", None)?;
+    let path : PathBuf = mathfont.try_get().ok()?;
+
+    let font_bytes = std::fs::read(&path).unwrap();
+    // TODO: find a more elegant way to deal with lifetimes.
+    // The lifetime in TtfMathFont & the requirement that closures fed to GTK are 'static come in conflict.
+    // We leak the memory of the box so as to get a 'static reference.
+    // This is ok, because we only leak once, but it's somewhat inelegant.
+    Some(Box::leak(font_bytes.into_boxed_slice()))
+}
+
+fn parse_outfile(option : &VariantDict) -> Output {
+    fn aux(option : &VariantDict) -> Option<PathBuf> {
+        let outfile = option.lookup_value("outfile", None)?;
+        outfile.try_get().ok()
+    }
+    aux(option).map(|path| Output::Path(path)).unwrap_or_default()
+}
+
+fn parse_format(option : &VariantDict) -> Option<Format> {
+    let outfile = option.lookup_value("format", None)?;
+    let format_string = outfile.try_get::<String>().ok()?;
+    match format_string.as_str() {
+        "svg" => Some(Format::Svg),
+        "tex" => Some(Format::Tex),
+        _     => None,
+    } 
+}
+
+
+fn build_ui(app : &Application, font : TtfMathFont<'static>, format : Format, outfile : Rc<RefCell<Output>>) {
+    let font = Rc::new(font);
+
     let window = ApplicationWindow::builder()
         .application(app)
         .title("Math Preview")
@@ -116,11 +219,12 @@ fn build_ui(app : &Application, font : Rc<TtfMathFont<'static>>) {
         draw_area.queue_draw()
     }));
 
+    const canvas_size : (f64, f64) = (500., 200.);
 
     let button = Button::with_label("Save to SVG");
-    button.connect_clicked(clone!(@weak text_buffer, @strong text_buffer => move |_| {
+    button.connect_clicked(clone!(@weak text_buffer, @strong text_buffer, @strong font, => move |_| {
         if let Some(text) = text_buffer.text(&text_buffer.start_iter(), &text_buffer.end_iter(), false) {
-            let result = save_svg(Path::new(SVG_PATH), text.as_str(), font.clone(), (500., 200.));
+            let result = save_svg(&Output::Path(PathBuf::from(SVG_PATH)), text.as_str(), font.clone(), canvas_size);
         }
     }));
 
@@ -142,10 +246,11 @@ fn build_ui(app : &Application, font : Rc<TtfMathFont<'static>>) {
     vbox.add(&button);
     window.add(&vbox);
 
-    window.connect_delete_event(clone!(@strong text_buffer => move |_, _| {
-        if let Some(text) = text_buffer.text(&text_buffer.start_iter(), &text_buffer.end_iter(), false) {
-            println!("{}", text);
-        }
+    // window.connect_delete_event(move |_, _| {
+    //     Inhibit(false)
+    // });
+    window.connect_delete_event(clone!(@strong text_buffer, @strong outfile, @strong font, => move |_, _| {
+        save_to_output(&text_buffer, outfile.borrow().deref(), format, font.clone(), canvas_size);
         Inhibit(false)
     }));
 
@@ -153,10 +258,31 @@ fn build_ui(app : &Application, font : Rc<TtfMathFont<'static>>) {
     
 }
 
+fn save_to_output(text_buffer: &gtk::TextBuffer, outfile: &Output, format : Format, font : Rc<TtfMathFont>, canvas_size : (f64, f64),) -> Option<()> {
+    let text = text_buffer.text(&text_buffer.start_iter(), &text_buffer.end_iter(), false)?;
+    match format {
+        Format::Svg => save_svg(outfile, &text, font, canvas_size),
+        Format::Tex => save_tex(outfile, &text),
+    }
+}
 
-fn save_svg(path : &Path, formula : &str, font : Rc<TtfMathFont>, canvas_size : (f64, f64),) -> Option<()> {
+fn save_tex(outfile: &Output, text: &str) -> Option<()> {
+    if let Output::Path(outfile_path) = outfile {
+        std::fs::write(outfile_path, text).map_err(|e|
+            // TODO: don't start process if path does not exist.
+            eprintln!("Couldn't write to path: {}", e)
+        ).ok()
+    }
+    else {
+        println!("{}", text);
+        Some(())
+    }
+}
+
+
+fn save_svg(path : &Output, formula : &str, font : Rc<TtfMathFont>, canvas_size : (f64, f64),) -> Option<()> {
     let (width, height) = canvas_size;
-    let svg_surface = gtk::cairo::SvgSurface::new(width, height, Some(path)).ok()?;
+    let svg_surface = gtk::cairo::SvgSurface::for_stream(width, height, path.stream().ok()?).ok()?;
     let context = Context::new(svg_surface).ok()?;
 
     draw_formula(formula, &context, font, Some((width, height)))?;
