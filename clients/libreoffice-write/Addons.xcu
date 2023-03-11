@@ -1,0 +1,36 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<oor:component-data 
+ xmlns:oor="http://openoffice.org/2001/registry"
+ xmlns:xs="http://www.w3.org/2001/XMLSchema"
+ oor:name="Addons"
+ oor:package="org.openoffice.Office">
+    <node oor:name="AddonUI">
+        <node oor:name="OfficeToolBar">
+            <node oor:name="InsertFromMathsPreview.OfficeToolBar" oor:op="replace">
+                <node oor:name="m1" oor:op="replace"> 
+                    <prop oor:name="Context" oor:type="xs:string">
+                        <value>com.sun.star.text.TextDocument</value>
+                    </prop>
+                    <prop oor:name="URL" oor:type="xs:string">
+                        <value>vnd.sun.star.script:insert_from_maths_preview.oxt|src|insert_formula.py$main?language=Python&amp;location=user:uno_packages</value>
+                    </prop>
+                    <prop oor:name="ImageIdentifier" oor:type="xs:string">
+                        <value>%origin%/images/formula.png</value>
+                    </prop>
+                    <prop oor:name="Title" oor:type="xs:string">
+                        <value>Insert From Formula</value>
+                        <!-- 
+                        <value xml:lang="fr"></value>
+                        <value xml:lang="de"></value>
+                        <value xml:lang="es"></value>
+                        <value xml:lang="pt-BR"></value>
+                         -->
+                    </prop>
+                    <prop oor:name="Target" oor:type="xs:string">
+                        <value>_self</value>
+                    </prop>
+                </node>
+            </node>
+        </node>
+    </node>
+</oor:component-data>
