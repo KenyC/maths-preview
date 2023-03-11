@@ -4,6 +4,7 @@ use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
+use cairo::ffi::FONT_SLANT_OBLIQUE;
 use cairo::glib::{VariantTy, VariantDict};
 use gtk::cairo::Context;
 
@@ -13,6 +14,7 @@ use gtk::glib::clone;
 use gtk::subclass::scrolled_window;
 use gtk::{prelude::*, TextView, DrawingArea, glib, Button};
 use gtk::{Application, ApplicationWindow};
+use rex::error::{FontError, LayoutError};
 use rex::layout::Grid;
 use rex::{Renderer, GraphicsBackend, FontBackend, Backend};
 use rex::font::FontContext;
@@ -23,6 +25,7 @@ use rex::parser::parse;
 const EXAMPLE_FORMULA : &str = r"\left.x^{x^{x^x_x}_{x^x_x}}_{x^{x^x_x}_{x^x_x}}\right\} \mathrm{wat?}";
 
 const SVG_PATH : &str = "example.svg";
+const UI_FONT_SIZE : f64 = 10.0;
 const DEFAULT_FONT : &[u8] = include_bytes!("../resources/rex-xits.otf");
 
 
@@ -48,7 +51,7 @@ impl Output {
     fn stream(&self) -> std::io::Result<Box<dyn Write + 'static>> {
         match self {
             Output::Stdout     => Ok(Box::new(std::io::stdout())),
-            Output::Path(path) => Ok(Box::new(std::fs::File::open(path)?)),
+            Output::Path(path) => Ok(Box::new(std::fs::File::create(path)?)),
         }
     } 
 }
@@ -58,11 +61,43 @@ impl Default for Output {
 }
 
 
+#[derive(Debug,)]
+enum AppError {
+    CouldNotGetTextBuffer,
+    ParseError,
+    IOError(std::io::Error),
+    CairoError(cairo::Error),
+    FontError(FontError),
+    LayoutError(LayoutError),
+}
+
+type AppResult<A> = Result<A, AppError>;
+
+impl From<std::io::Error> for AppError {
+    fn from(err: std::io::Error) -> Self 
+    { Self::IOError(err) }
+}
+
+impl From<cairo::Error> for AppError {
+    fn from(err: cairo::Error) -> Self 
+    { Self::CairoError(err) }
+}
+
+impl From<FontError> for AppError {
+    fn from(err: FontError) -> Self 
+    { Self::FontError(err) }
+}
+
+impl From<LayoutError> for AppError {
+    fn from(err: LayoutError) -> Self 
+    { Self::LayoutError(err) }
+}
 
 
 fn main() {
     let math_font_file : Rc<Cell<& 'static [u8]>> = Rc::new(Cell::new(DEFAULT_FONT)); 
     let format         : Rc<Cell<Format>> = Rc::new(Cell::default()); 
+    let font_size      : Rc<Cell<f64>>    = Rc::new(Cell::new(UI_FONT_SIZE)); 
     let outfile : Rc<RefCell<Output>> = Rc::new(RefCell::default());
 
 
@@ -97,9 +132,18 @@ fn main() {
         None,
     );
 
+    application.add_main_option(
+        "fontsize",
+        gtk::glib::Char(b's' as i8),
+        gtk::glib::OptionFlags::IN_MAIN & gtk::glib::OptionFlags::OPTIONAL_ARG, 
+        gtk::glib::OptionArg::Double, 
+        "Size of font in the SVG output (default: 10)", 
+        None,
+    );
 
 
-    application.connect_handle_local_options(clone!(@strong math_font_file, @strong outfile, @strong format, => move |_application, option| {
+
+    application.connect_handle_local_options(clone!(@strong math_font_file, @strong outfile, @strong font_size, @strong format, => move |_application, option| {
         if let Some(font_file) = parse_path(option) {
             math_font_file.set(font_file);
         }
@@ -107,10 +151,13 @@ fn main() {
         if let Some(option_format) = parse_format(option) {
             format.set(option_format);
         } 
+        if let Some(font_size_arg) = parse_font_size(option) {
+            font_size.set(font_size_arg);
+        } 
         -1
     }));
     application.connect_activate(clone!(@strong outfile => move |app| 
-        build_ui(app, load_font(math_font_file.get()), format.get(), outfile.clone())
+        build_ui(app, load_font(math_font_file.get()), font_size.get(), format.get(), outfile.clone())
     ));
 
 
@@ -158,7 +205,16 @@ fn parse_format(option : &VariantDict) -> Option<Format> {
 }
 
 
-fn build_ui(app : &Application, font : TtfMathFont<'static>, format : Format, outfile : Rc<RefCell<Output>>) {
+fn parse_font_size(option : &VariantDict) -> Option<f64> {
+    let outfile = option.lookup_value("fontsize", None)?;
+    let result = outfile.try_get::<f64>().unwrap();
+    Some(result)
+}
+
+
+fn build_ui(app : &Application, font : TtfMathFont<'static>, font_size : f64, format : Format, outfile : Rc<RefCell<Output>>) {
+    dbg!(font_size);
+    dbg!(format);
     let font = Rc::new(font);
 
     let window = ApplicationWindow::builder()
@@ -199,15 +255,15 @@ fn build_ui(app : &Application, font : TtfMathFont<'static>, format : Format, ou
                 area.allocated_height() as f64,
             );
 
-            let result = draw_formula(text.as_str(), context, font.clone(), Some((width, height)));
-            if result.is_some() {
+            let result = draw_formula(text.as_str(), context, font.clone(), UI_FONT_SIZE, Some((width, height)));
+            if result.is_ok() {
                 let mut str_ref = last_ok_string.borrow_mut();
                 str_ref.clear();
                 str_ref.push_str(text.as_str());
             }
             else {
                 eprintln!("error!");
-                draw_formula(last_ok_string.borrow().as_str(), context, font.clone(), Some((width, height)));
+                draw_formula(last_ok_string.borrow().as_str(), context, font.clone(), UI_FONT_SIZE, Some((width, height)));
             }
         }
         Inhibit(false)
@@ -224,7 +280,7 @@ fn build_ui(app : &Application, font : TtfMathFont<'static>, format : Format, ou
     let button = Button::with_label("Save to SVG");
     button.connect_clicked(clone!(@weak text_buffer, @strong text_buffer, @strong font, => move |_| {
         if let Some(text) = text_buffer.text(&text_buffer.start_iter(), &text_buffer.end_iter(), false) {
-            let result = save_svg(&Output::Path(PathBuf::from(SVG_PATH)), text.as_str(), font.clone(), canvas_size);
+            let result = save_svg(&Output::Path(PathBuf::from(SVG_PATH)), text.as_str(), font.clone(), font_size);
         }
     }));
 
@@ -250,7 +306,7 @@ fn build_ui(app : &Application, font : TtfMathFont<'static>, format : Format, ou
     //     Inhibit(false)
     // });
     window.connect_delete_event(clone!(@strong text_buffer, @strong outfile, @strong font, => move |_, _| {
-        save_to_output(&text_buffer, outfile.borrow().deref(), format, font.clone(), canvas_size);
+        save_to_output(&text_buffer, outfile.borrow().deref(), format, font.clone(), font_size).unwrap();
         Inhibit(false)
     }));
 
@@ -258,59 +314,51 @@ fn build_ui(app : &Application, font : TtfMathFont<'static>, format : Format, ou
     
 }
 
-fn save_to_output(text_buffer: &gtk::TextBuffer, outfile: &Output, format : Format, font : Rc<TtfMathFont>, canvas_size : (f64, f64),) -> Option<()> {
-    let text = text_buffer.text(&text_buffer.start_iter(), &text_buffer.end_iter(), false)?;
+fn save_to_output(text_buffer: &gtk::TextBuffer, outfile: &Output, format : Format, font : Rc<TtfMathFont>, font_size : f64) -> AppResult<()> {
+    let text = text_buffer.text(&text_buffer.start_iter(), &text_buffer.end_iter(), false).ok_or(AppError::CouldNotGetTextBuffer)?;
+    eprintln!("Saving to {:?}", outfile);
     match format {
-        Format::Svg => save_svg(outfile, &text, font, canvas_size),
+        Format::Svg => save_svg(outfile, &text, font, font_size),
         Format::Tex => save_tex(outfile, &text),
     }
 }
 
-fn save_tex(outfile: &Output, text: &str) -> Option<()> {
+fn save_tex(outfile: &Output, text: &str) -> AppResult<()> {
     if let Output::Path(outfile_path) = outfile {
-        std::fs::write(outfile_path, text).map_err(|e|
-            // TODO: don't start process if path does not exist.
-            eprintln!("Couldn't write to path: {}", e)
-        ).ok()
+        let result = std::fs::write(outfile_path, text)?;
+        Ok(result)
     }
     else {
         println!("{}", text);
-        Some(())
+        Ok(())
     }
 }
 
 
-fn save_svg(path : &Output, formula : &str, font : Rc<TtfMathFont>, canvas_size : (f64, f64),) -> Option<()> {
-    let (width, height) = canvas_size;
-    let svg_surface = gtk::cairo::SvgSurface::for_stream(width, height, path.stream().ok()?).ok()?;
-    let context = Context::new(svg_surface).ok()?;
+fn save_svg(path : &Output, formula : &str, font : Rc<TtfMathFont>, font_size : f64,) -> AppResult<()> {
+    let (layout, renderer, formula_bbox) = layout_and_size(font.as_ref(), font_size, formula)?;
 
-    draw_formula(formula, &context, font, Some((width, height)))?;
+    eprintln!("Saving to SVG!");
+    let width  = formula_bbox.2;
+    let height = formula_bbox.3;
+    let svg_surface = gtk::cairo::SvgSurface::for_stream(width, height, path.stream()?)?;
+    let context = Context::new(svg_surface)?;
 
-    Some(())
+    render_layout(&context, None, formula_bbox, renderer, layout)
+
 }
 
 
-fn draw_formula<'a>(formula : &str, context: &Context, font : Rc<TtfMathFont<'a>>, canvas_size : Option<(f64, f64)>,) -> Option<()> {
-    let font_context = FontContext::new(font.as_ref()).ok()?;
-    let parse_node = parse(formula).ok()?;
-    let layout_settings = rex::layout::LayoutSettings::new(&font_context, 10.0, rex::layout::Style::Display);
-    let node = rex::layout::engine::layout(&parse_node, layout_settings).ok()?;
+fn draw_formula<'a>(formula : &str, context: &Context, font : Rc<TtfMathFont<'a>>, font_size : f64, canvas_size : Option<(f64, f64)>,) -> AppResult<()> {
+    let (layout, renderer, formula_bbox) = layout_and_size(font.as_ref(), font_size, formula,)?;
 
-    // TODO : using the node directly results in an incorrect estimation of height and width of the formula
-    // A problem in downstream ReX?
-    let mut grid = Grid::new();
-    grid.insert(0, 0, node.as_node());
-    let mut layout = rex::layout::Layout::new();
-    layout.add_node(grid.build());
+    render_layout(context, canvas_size, formula_bbox, renderer, layout)
+}
 
-
-    let renderer = Renderer::new();
-
+fn render_layout(context: &Context, canvas_size: Option<(f64, f64)>, formula_bbox: (f64, f64, f64, f64), renderer: Renderer, layout: rex::layout::Layout<TtfMathFont>) -> Result<(), AppError> {
     // let (x0, y0, x1, y1) = renderer.size(&node);
-    context.save().ok()?;
+    context.save()?;
     if let Some(canvas_size) = canvas_size {
-        let formula_bbox = renderer.size(&layout);
         scale_and_center(formula_bbox, context, canvas_size);
     }
 
@@ -319,8 +367,22 @@ fn draw_formula<'a>(formula : &str, context: &Context, font : Rc<TtfMathFont<'a>
 
 
 
-    context.restore().ok()?;
-    Some(())
+    context.restore()?;
+    Ok(())
+}
+
+fn layout_and_size<'a, 'f>(font: &'f TtfMathFont<'a>, font_size : f64, formula: &str) -> Result<(rex::layout::Layout<'f, TtfMathFont<'a>>, Renderer, (f64, f64, f64, f64)), AppError> {
+    let font_context = FontContext::new(font)?;
+    let parse_node = parse(formula).map_err(|_| AppError::ParseError)?;
+    let layout_settings = rex::layout::LayoutSettings::new(&font_context, font_size, rex::layout::Style::Display);
+    let node = rex::layout::engine::layout(&parse_node, layout_settings)?;
+    let mut grid = Grid::new();
+    grid.insert(0, 0, node.as_node());
+    let mut layout = rex::layout::Layout::new();
+    layout.add_node(grid.build());
+    let renderer = Renderer::new();
+    let formula_bbox = renderer.size(&layout);
+    Ok((layout, renderer, formula_bbox))
 }
 
 fn scale_and_center(bbox: (f64, f64, f64, f64), context: &Context, canvas_size: (f64, f64)) {
