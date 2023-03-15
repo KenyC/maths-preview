@@ -3,15 +3,32 @@ Maths Preview
 
 A fast and minimal WYSIWYG for LateX mathematical formulas.
 
-<p align="center"><img src="screenshots/demonstration.gif" alt="Demo GIF" width="300px"/></p>
-
+<p align="center"><img src="screenshots/demo.gif" alt="Demo GIF" width="300px"/></p>
 
 
 ## Desiderata
 
  - **Real-time Rendering:** see things appear as I type them, not 250ms later.
- - **Pluggability:** the previewer should be able to interface and be launched from typesetting environments, such as text editor (outputs LateX) or LibreOffice Writer (outputs SVG).
+ - **Pluggability:** the previewer should be able to interface with and be launched from typesetting environments, such as text editors or word processors or standalone. Outputs a SVG or a LateX formula.
 
+## Usage
+
+### Overview
+
+Launch the program (e.g. `cargo r`), write down a formula and see it update in the display in real-time. Close the app ; some output is generated. The option `-f` specifies whether this output is a SVG render of the formula or the simply the LateX code you typed in. The option `-o` specifies where the output file will be written. If left unspecified, the output will be provided on stdout. Using option `-i`, you can specify which formula is displayed on program start.
+
+### Full description of the options
+
+```
+Application Options:
+  -m, --mathfont             Path to an OpenType maths font to use for render (default: STIX Maths, bundled in the executable)
+  -i, --informula            Formula to edit (default: $\left.x^{x^{x^x_x}_{x^x_x}}_{x^{x^x_x}_{x^x_x}}\right\} \mathrm{wat?}$)
+  -o, --outfile              Output file ; if left unspecified, output is directed to stdout.
+  -d, --metainfo             Whether to output meta-info on stdout (baseline position, font size, formula, etc.). If 'outfile' is not specified, stdout will contain both the output and the meta-info
+  -f, --format               Format of 'outfile' ('svg', 'tex') ; defaults to 'tex'
+  -s, --fontsize             Size of font in the SVG output (default: 10)
+  --display=DISPLAY          X display to use
+```
 
 ## Building & installing
 
@@ -21,13 +38,15 @@ Run:
 cargo b --release
 ```
 
-The program relies on the GTK3 library. The steps to install the development files needed for GTK3 depend on the OS and distribution. On Debian/Ubuntu: `sudo apt install libgtk-3-dev`.
+The program relies on some Rust crates and the GTK3 library. Cargo will take care of the Rust dependencies but you will need to install the GTK3 library and its development files yourself. The steps to install the development files needed for GTK3 depend on the OS and distribution. On Debian/Ubuntu: `sudo apt install libgtk-3-dev`.
 
-Copy the executable `target/release/maths_preview` to your PATH, e.g. in `~/bin`.
+When build is complete, the executable should be under `target/release/maths_preview`. You can add it to your PATH, e.g. by copying it to in `~/bin`.
 
 ## Plugins
 
 ### Sublime Text
+
+<p align="center"><img src="screenshots/sublime_text_demo.gif" alt="Demo Sublime Text plugin"/></p>
 
 Under `clients/sublime-text/`, you will find a Sublime Text package providing the command `MathsPreview: Insert Formula` to use Maths Preview in Sublime Text.
 

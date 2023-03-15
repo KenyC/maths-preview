@@ -125,7 +125,7 @@ fn main() {
         .application_id("com.example.MathPreview")
         .build();
 
-    add_app_options(&application);
+    setup_command_line(&application);
 
 
 
@@ -172,13 +172,13 @@ fn main() {
     application.run();
 }
 
-fn add_app_options(application: &Application) {
+fn setup_command_line(application: &Application) {
     application.add_main_option(
         "mathfont", 
         gtk::glib::Char(b'm' as i8), 
         gtk::glib::OptionFlags::IN_MAIN, 
         gtk::glib::OptionArg::Filename, 
-        "The OpenType maths font to use for render", 
+        "Path to an OpenType maths font to use for render (default: STIX Maths, bundled in the executable)", 
         None,
     );
 
@@ -206,7 +206,7 @@ fn add_app_options(application: &Application) {
         gtk::glib::Char(b'd' as i8), 
         gtk::glib::OptionFlags::IN_MAIN,
         gtk::glib::OptionArg::None, 
-        "Output meta-info on stdout (baseline position, font size, formula, etc.). If 'outfile' is not specified, stdout will contain both the output and the meta-info", 
+        "Whether to output some meta-info on stdout (baseline position, font size, formula, etc.). If 'outfile' is not specified and this option is used, stdout will contain both the output and the meta-info", 
         None,
     );
 
@@ -215,7 +215,7 @@ fn add_app_options(application: &Application) {
         gtk::glib::Char(b'f' as i8),
         gtk::glib::OptionFlags::IN_MAIN, 
         gtk::glib::OptionArg::String, 
-        "Format of 'outfile' ('svg', 'tex') ; defaults to 'tex'", 
+        "Format of 'outfile' ('svg', 'tex') ; defaults to 'tex'.", 
         None,
     );
 
