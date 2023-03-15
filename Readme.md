@@ -8,12 +8,12 @@ A fast and minimal WYSIWYG for LateX mathematical formulas.
 
 ## Desiderata
 
- - **Real-time Rendering:** see things appear as I type them, not 250ms later.
- - **Pluggability:** the previewer should be able to interface with and be launched from typesetting environments, such as text editors or word processors or standalone. Outputs a SVG or a LateX formula.
+ - **Real-time Rendering:** see things appear as you type them, not 250ms later. This is possible by using the ReX maths engine (in fact, a fork thereof) instead of calling TeX.
+ - **Pluggability:** the previewer should be able to interface with and be launched from typesetting environments, such as text editors or word processors or standalone. See below for Sublime Text and LibreOffice Writer plugins.
 
-## Usage
+## Overview
 
-### Overview
+### Usage
 
 Launch the program (e.g. `cargo r`), write down a formula and see it update in the display in real-time. Close the app ; some output is generated. The option `-f` specifies whether this output is a SVG render of the formula or the simply the LateX code you typed in. The option `-o` specifies where the output file will be written. If left unspecified, the output will be provided on stdout. Using option `-i`, you can specify which formula is displayed on program start.
 
@@ -38,7 +38,7 @@ Run:
 cargo b --release
 ```
 
-The program relies on some Rust crates and the GTK3 library. Cargo will take care of the Rust dependencies but you will need to install the GTK3 library and its development files yourself. The steps to install the development files needed for GTK3 depend on the OS and distribution. On Debian/Ubuntu: `sudo apt install libgtk-3-dev`.
+The program depends on some Rust crates and the GTK3 library. Cargo will take care of the Rust dependencies but you will need to install the GTK3 library and its development files yourself. The steps to install the development files needed for GTK3 depend on the OS and distribution. On Debian/Ubuntu: `sudo apt install libgtk-3-dev`.
 
 When build is complete, the executable should be under `target/release/maths_preview`. You can add it to your PATH, e.g. by copying it to in `~/bin`.
 
