@@ -2,14 +2,17 @@
 from __future__ import unicode_literals
 import uno
 import unohelper
+import msgbox
 from com.sun.star.beans import PropertyValue
 from com.sun.star.awt import Size
 from com.sun.star.text.ControlCharacter import PARAGRAPH_BREAK, LINE_BREAK
 from com.sun.star.awt.FontWeight import BOLD as FW_BOLD
+from com.sun.star.text.TextContentAnchorType import AS_CHARACTER, AT_PARAGRAPH
 import enum
 import logging
 import time
 import subprocess
+import json
 import tempfile
 import os
 import uuid
@@ -20,7 +23,13 @@ FORMATS = [
 ]
 PATH_EXE = "/home/keny/bin/maths_preview"
 
-def main(*args):
+def insert_block_formula(*args):
+	insert_formula(block = True)
+
+def insert_inline_formula(*args):
+	insert_formula(block = False)
+
+def insert_formula(block):
 	# create temporary file path
 	path = os.path.join(tempfile.gettempdir(), str(uuid.uuid4()))
 
@@ -37,21 +46,44 @@ def main(*args):
 	cursor = doc.CurrentController.ViewCursor	
 	char_height = cursor.CharHeight
 
+	# Find potential graphics object in selection
+	content_enumeration = cursor.getText().createEnumeration()
+	while content_enumeration.hasMoreElements():
+		print(content_enumeration.nextElement())
+
 	# Start program
 	result = subprocess.run([
 		PATH_EXE, 
 		"-s", str(char_height),
 		"-f", "svg", 
+		"-d", 
 		"-o", path
 	], 
 		stdout = subprocess.PIPE, 
 		stderr = subprocess.PIPE,
 	)
-	print(result.stdout.decode("utf-8"))
-	print(result.stderr.decode("utf-8"))
+	stdout = result.stdout.decode("utf-8") 
+	stderr = result.stderr.decode("utf-8") 
+	print(stdout)
+	print(stderr)
 	if result.returncode != 0:
-		print("ERROR: maths_preview didn't return positive")
+		msg_box(
+			"ERROR: maths_preview returned {}\\stdout: {}\\stderr: {}".format(
+				result.returncode,
+				stdout, stderr,
+			)
+		)
 		return
+
+	metainfo = json.loads(stdout)
+
+	baseline_percentage = None
+	if not block:
+		baseline_percentage = metainfo["metrics"]["baseline"] / (metainfo["metrics"]["bbox"]["y_max"] - metainfo["metrics"]["bbox"]["y_min"]) 
+
+
+	description = metainfo["formula"]
+	print(metainfo)	
 
 	# Paste image
 	add_embedded_image(
@@ -59,20 +91,23 @@ def main(*args):
 		graphic_provider, 
 		doc,
 		path,
+		description,
+		baseline_percentage,
 	)
 
 
-def add_embedded_image(cursor, graphic_provider, doc, path, dpi = 1.0, width=None, height=None, paraadjust=None):
+def add_embedded_image(cursor, graphic_provider, doc, path, description, baseline_percentage = None, dpi = 1.0, width=None, height=None, paraadjust=None):
 	# TODO : dpi should be guessed from buffer
 	# scale = 1000 * 2.54 / float(dpi)
 	scale = 10 * 2.54 / float(dpi) # this seems like the good ratio, I have no idea why!
+	block = baseline_percentage is None
 
 
 	try:
 		file_url = unohelper.systemPathToFileUrl(path)
 		graphic = graphic_provider.queryGraphic((PropertyValue('URL', 0, file_url, 0), ))
 		if graphic is None:
-			print("No file!")
+			msg_box("No file was returned by the program!")
 			return
 			
 		if graphic.SizePixel is None:
@@ -99,6 +134,31 @@ def add_embedded_image(cursor, graphic_provider, doc, path, dpi = 1.0, width=Non
 		text_graphic_object = doc.createInstance("com.sun.star.text.TextGraphicObject")
 		text_graphic_object.Graphic = graphic_object_shape.Graphic
 		text_graphic_object.setSize(size)
+		text_graphic_object.Description = description
+		print(baseline_percentage)
+
+		print(original_size.Width, original_size.Height)
+		if block:
+			print("Block")
+			text_graphic_object.AnchorType = AT_PARAGRAPH
+		else:
+			print("Inline")
+			text_graphic_object.AnchorType = AS_CHARACTER
+			text_graphic_object.VertOrient = 0
+			print("((baseline_percentage + 1) * original_size.Height) * scale", ((baseline_percentage + 1) * original_size.Height) * scale)
+			# text_graphic_object.VertOrientPosition = ((baseline_percentage - 1) * original_size.Height) * scale
+
+			"""
+			ere             erere
+			   +-----------+     ∧
+			   |           |     |   (1 + baseline) * height
+			   +- - - - - -+ ∧   v
+			   |           | |   - baseline * height
+			   +-----------+ v
+
+
+			"""
+			text_graphic_object.VertOrientPosition = -  (1 + baseline_percentage) * original_size.Height * scale
 
 		if paraadjust:
 			oldparaadjust = cursor.ParaAdjust
@@ -111,4 +171,10 @@ def add_embedded_image(cursor, graphic_provider, doc, path, dpi = 1.0, width=Non
 		print(e)
 
 
+def msg_box(text):
+    myBox = msgbox.MsgBox(XSCRIPTCONTEXT.getComponentContext())
+    myBox.addButton("OK")
+    myBox.renderFromButtonSize()
+    myBox.numberOflines = 2
+    myBox.show(text,0,"Watching")
 

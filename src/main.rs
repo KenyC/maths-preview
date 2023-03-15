@@ -4,15 +4,16 @@ use std::ops::{Deref, DerefMut};
 use std::path::PathBuf;
 use std::rc::Rc;
 
+use serde::{Deserialize, Serialize};
+use serde_json;
 
 use cairo::glib::VariantDict;
 use gtk::cairo::Context;
-
-
 use gtk::gio::SimpleAction;
 use gtk::glib::clone;
 use gtk::{prelude::*, TextView, DrawingArea, glib, Button};
 use gtk::{Application, ApplicationWindow};
+
 use rex::error::{FontError, LayoutError};
 use rex::layout::Grid;
 use rex::{Renderer, GraphicsBackend, FontBackend, Backend};
@@ -344,7 +345,6 @@ fn build_ui(app : &Application, font : TtfMathFont<'static>, app_context : AppCo
         draw_area.queue_draw()
     }));
 
-    const canvas_size : (f64, f64) = (500., 200.);
 
     let button = Button::with_label("Save to SVG");
     button.connect_clicked(clone!(@strong text_buffer, @strong font, => move |_| {
@@ -392,7 +392,11 @@ fn save_to_output(text_buffer: &gtk::TextBuffer, outfile: &Output, format : Form
             let metrics = save_svg(outfile, &text, font, font_size)?;
             if print_metainfo {
                 let metainfo = MetaInfo { metrics, formula: text.to_string() };
-                println!("{}", metainfo.json());
+                let json = serde_json::to_string(&metainfo);
+                match json {
+                    Ok(json)  => println!("{}", json),
+                    Err(err)  => {dbg!(err);},
+                }
             }
             Ok(())
         },
@@ -416,13 +420,13 @@ fn save_svg(path : &Output, formula : &str, font : Rc<TtfMathFont>, font_size : 
     let (layout, renderer, formula_metrics) = layout_and_size(font.as_ref(), font_size, formula)?;
 
     eprintln!("Saving to SVG!");
-    let formula_bbox = formula_metrics.bbox.clone();
-    let width  = formula_bbox.2;
-    let height = formula_bbox.3;
+    let formula_bbox = &formula_metrics.bbox;
+    let width  = formula_bbox.width();
+    let height = formula_bbox.height();
     let svg_surface = gtk::cairo::SvgSurface::for_stream(width, height, path.stream()?)?;
     let context = Context::new(svg_surface)?;
 
-    render_layout(&context, None, formula_bbox, renderer, layout)?;
+    render_layout(&context, None, &formula_metrics, renderer, layout)?;
     Ok(formula_metrics)
 
 }
@@ -430,20 +434,21 @@ fn save_svg(path : &Output, formula : &str, font : Rc<TtfMathFont>, font_size : 
 
 fn draw_formula<'a>(formula : &str, context: &Context, font : Rc<TtfMathFont<'a>>, font_size : f64, canvas_size : Option<(f64, f64)>,) -> AppResult<()> {
     let (layout, renderer, formula_metrics) = layout_and_size(font.as_ref(), font_size, formula,)?;
-    render_layout(context, canvas_size, dbg!(formula_metrics).bbox, renderer, layout)
+    render_layout(context, canvas_size, &dbg!(formula_metrics), renderer, layout)
 }
 
 fn render_layout(
     context: &Context, 
     canvas_size: Option<(f64, f64)>, 
-    formula_bbox: (f64, f64, f64, f64), 
+    formula_metrics: &Metrics, 
     renderer: Renderer, 
     layout: rex::layout::Layout<TtfMathFont>,
 ) -> Result<(), AppError> {
     // let (x0, y0, x1, y1) = renderer.size(&node);
     context.save()?;
+    let Metrics { bbox, .. } = formula_metrics;
     if let Some(canvas_size) = canvas_size {
-        scale_and_center(formula_bbox, context, canvas_size);
+        scale_and_center(*bbox, context, canvas_size);
     }
 
     let mut backend = CairoBackend(context.clone());
@@ -455,42 +460,40 @@ fn render_layout(
     Ok(())
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Clone, Copy)]
+struct BBox {
+    x_min  : f64,
+    y_min  : f64,
+    x_max  : f64,
+    y_max  : f64,
+}
+
+impl BBox {
+    fn new(x_min: f64, y_min: f64, x_max: f64, y_max: f64) -> Self { Self { x_min, y_min, x_max, y_max } }
+
+    #[inline]
+    fn width(&self) -> f64 { self.x_max - self.x_min }
+
+    #[inline]
+    fn height(&self) -> f64 { self.y_max - self.y_min }
+}
+
+
+#[derive(Debug, Serialize)]
 struct Metrics {
-    bbox      : (f64, f64, f64, f64,),
+    bbox      : BBox,
     baseline  : f64,
     font_size : f64,
 }
 
-impl Metrics {
-    fn new(bbox: (f64, f64, f64, f64,), baseline: f64, font_size: f64) -> Self { Self { bbox, baseline, font_size } }
 
-}
 
+#[derive(Debug, Serialize)]
 struct MetaInfo {
     metrics : Metrics,
     formula : String,
 }
 
-impl MetaInfo {
-    fn json(&self) -> String {
-        let metrics = &self.metrics;
-        format!(
-"{{
- \"formula\" : \"{}\"
- \"metrics\" : {{
-    \"bbox\":      [{}, {}, {}, {}],
-    \"baseline\":  {},
-    \"font_size\": {},
-}}}}",
-            self.formula,
-            metrics.bbox.0, metrics.bbox.1, metrics.bbox.2, metrics.bbox.3,
-            metrics.baseline, 
-            metrics.font_size,
-        )
-    }
-
-}
 
 fn layout_and_size<'a, 'f>(font: &'f TtfMathFont<'a>, font_size : f64, formula: &str) -> Result<(rex::layout::Layout<'f, TtfMathFont<'a>>, Renderer, Metrics), AppError> {
     let parse_node = parse(formula).map_err(|_| AppError::ParseError)?;
@@ -513,7 +516,7 @@ fn layout_and_size<'a, 'f>(font: &'f TtfMathFont<'a>, font_size : f64, formula: 
 
     // Create metrics
     let metrics = Metrics {
-        bbox: formula_bbox,
+        bbox: BBox::new(formula_bbox.0, formula_bbox.1, formula_bbox.2, formula_bbox.3,),
         baseline: depth / rex::dimensions::Px,
         font_size,
     };
@@ -521,13 +524,13 @@ fn layout_and_size<'a, 'f>(font: &'f TtfMathFont<'a>, font_size : f64, formula: 
     Ok((layout, renderer, metrics))
 }
 
-fn scale_and_center(bbox: (f64, f64, f64, f64), context: &Context, canvas_size: (f64, f64)) {
-    let (x0, y0, x1, y1) = bbox;
+fn scale_and_center(bbox: BBox, context: &Context, canvas_size: (f64, f64)) {
+    let width   = bbox.width();
+    let height  = bbox.height();
     let (canvas_width, canvas_height) = canvas_size;
-    let width   = x1 - x0;
-    let height  = y1 - y0;
-    let midx = 0.5 * (x0 + x1);
-    let midy = 0.5 * (y0 + y1);
+    let BBox { x_min, y_min, x_max, y_max } = bbox;
+    let midx = 0.5 * (x_min + x_max);
+    let midy = 0.5 * (y_min + y_max);
 
     let fit_to_width  = canvas_width / width;
     let fit_to_height = canvas_height / height;

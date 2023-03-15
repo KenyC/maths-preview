@@ -46,5 +46,15 @@ Under `clients/sublime-text/`, you will find a Sublime Text package providing th
 
 ### LibreOffice Writer
 
-(projected)
+<p align="center"><img src="screenshots/libreoffice_writer_demo.gif" alt="Demo LibreOffice Writer plugin"/></p>
+
+#### Installation
+
+Under `clients/libreoffice-writer`, run `make`. This will zip the add-on and automatically add it to LibreOffice Writer.
+
+#### Usage
+
+  - Click on `Inline Formula` or `Block Formula` in the toolbar.
+  - Write the formula and exit the window, by using e.g. Esc.
+  - The formula you typed is inserted in the document. 
 
