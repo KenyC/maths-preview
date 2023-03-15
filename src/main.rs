@@ -26,7 +26,8 @@ const EXAMPLE_FORMULA : &str = r"\left.x^{x^{x^x_x}_{x^x_x}}_{x^{x^x_x}_{x^x_x}}
 
 const SVG_PATH : &str = "example.svg";
 const UI_FONT_SIZE : f64 = 10.0;
-const DEFAULT_FONT : &[u8] = include_bytes!("../resources/rex-xits.otf");
+// const DEFAULT_FONT : &[u8] = include_bytes!("../resources/rex-xits.otf");
+const DEFAULT_FONT : &[u8] = include_bytes!("../resources/LibertinusMath-Regular.otf");
 
 
 #[derive(Debug, Clone, Copy)]
