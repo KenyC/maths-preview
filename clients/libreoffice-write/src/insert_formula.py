@@ -21,7 +21,7 @@ FORMATS = [
 	"svg",
 	"png"
 ]
-PATH_EXE = "/home/keny/bin/maths_preview"
+PATH_EXE = "~/bin/maths_preview"
 
 def insert_block_formula(*args):
 	insert_formula(block = True)
@@ -53,7 +53,7 @@ def insert_formula(block):
 
 	# Start program
 	result = subprocess.run([
-		PATH_EXE, 
+		os.path.expanduser(PATH_EXE), 
 		"-s", str(char_height),
 		"-f", "svg", 
 		"-d", 
