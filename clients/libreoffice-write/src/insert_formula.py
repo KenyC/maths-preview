@@ -168,7 +168,7 @@ def create_graphic_object_shape_from_path(doc, graphic_provider, path,):
 
 
 
-fill_text_graphic_object_with_shape(text_graphic_object, graphic_object_shape, description = None, dpi = 1.0):
+def fill_text_graphic_object_with_shape(text_graphic_object, graphic_object_shape, description = None, dpi = 1.0):
 	scale = 10 * 2.54 / float(dpi) # this seems like the good ratio, I have no idea why!
 	original_size = graphic_object_shape.Graphic.SizePixel
 	size = Size(int(original_size.Width * scale), original_size.Height * scale)
