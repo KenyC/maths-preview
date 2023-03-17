@@ -2,33 +2,11 @@
 <oor:component-data xmlns:oor="http://openoffice.org/2001/registry" xmlns:xs="http://www.w3.org/2001/XMLSchema"
  oor:name="Settings" oor:package="InsertFromMathsPreview">
     <node oor:name="MathsPreviewExe">
-        <prop oor:name="EditorPath" oor:type="xs:string">
+        <prop oor:name="MathsPreviewPath" oor:type="xs:string">
             <value></value>
         </prop>
-        <prop oor:name="EditorArgs" oor:type="xs:string">
+        <prop oor:name="MathsFont" oor:type="xs:string">
             <value></value>
-        </prop>
-        <prop oor:name="DefaultHeader" oor:type="xs:string">
-            <value># coding: utf-8&#x0a;from __future__ import unicode_literals&#x0a;&#x0a;</value>
-        </prop>
-    </node>
-    <node oor:name="History">
-        <prop oor:name="SaveLastScript" oor:type="xs:boolean">
-          <value>true</value>
-        </prop>
-        <prop oor:name="SaveTreeState" oor:type="xs:boolean">
-          <value>false</value>
-        </prop>
-        <prop oor:name="UnloadChildsOnCollapse" oor:type="xs:boolean">
-          <value>false</value>
-        </prop>
-    </node>
-    <node oor:name="Logging">
-        <prop oor:name="LogLevel" oor:type="xs:short">
-          <value>0</value>
-        </prop>
-        <prop oor:name="LogToFile" oor:type="xs:short">
-          <value>0</value>
         </prop>
     </node>
 </oor:component-data>

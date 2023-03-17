@@ -35,6 +35,7 @@ from com.sun.star.uno import Exception as UNOException
 from com.sun.star.awt.MessageBoxType import MESSAGEBOX, ERRORBOX, WARNINGBOX
 from com.sun.star.awt.MessageBoxResults import YES
 from com.sun.star.ui.dialogs.TemplateDescription import FILESAVE_AUTOEXTENSION, FILEOPEN_SIMPLE
+from utils import *
 
 
 
@@ -52,14 +53,6 @@ class ResourceResolver(object):
 		self.srwl = self._get_resource_resolver()
 		self.version = self._get_ext_ver()
 
-	# def _get_ext_path(self):
-	#     '''Get addon installation path'''
-	#     pip = self.ctx.getByName(
-	#         "/singletons/com.sun.star.deployment.PackageInformationProvider")
-	#     extpath = pip.getPackageLocation(EXTID)
-	#     if extpath[-1] != "/":
-	#         extpath += "/"
-	#     return extpath
 
 	def _get_ext_ver(self):
 		'''Get addon version number'''
@@ -101,46 +94,6 @@ def loadResourceResolver(ctx):
 		RR = ResourceResolver(ctx)
 
 
-def createUnoService(service, ctx=None, args=None):
-    '''
-    Instanciate a Uno service.
-
-    @service: name of the service to be instanciated.
-    @ctx: the context if required.
-    @args: the arguments when needed.
-    '''
-    if not ctx:
-        ctx = uno.getComponentContext()
-    smgr = ctx.getServiceManager()
-    if ctx and args:
-        return smgr.createInstanceWithArgumentsAndContext(service, args, ctx)
-    elif args:
-        return smgr.createInstanceWithArguments(service, args)
-    elif ctx:
-        return smgr.createInstanceWithContext(service, ctx)
-    else:
-        return smgr.createInstance(service)
-
-
-
-def getConfigurationAccess(nodevalue, updatable=False):
-	'''
-	Access configuration value.
-
-	@nodevalue: the configuration key node as a string.
-	@updatable: set True when accessor needs to modify the key value.
-	'''
-	cp = createUnoService("com.sun.star.configuration.ConfigurationProvider")
-	node = PropertyValue("nodepath", 0, nodevalue, 0)
-	print("fezfez")
-	if updatable:
-		to_return = cp.createInstanceWithArguments("com.sun.star.configuration.ConfigurationUpdateAccess", (node,))
-		print("fez1")
-		return to_return
-	else:
-		to_return = cp.createInstanceWithArguments("com.sun.star.configuration.ConfigurationAccess", (node,))
-		print("fez")
-		return to_return
 
 
 # -----------------------------------------------------------
@@ -150,7 +103,7 @@ def getConfigurationAccess(nodevalue, updatable=False):
 # uno implementation
 g_ImplementationHelper = unohelper.ImplementationHelper()
 
-ImplementationName = "InsertFromMathsPreview.EditorKickerOptionsPage"
+ImplementationName = "InsertFromMathsPreview.AllOptionsPage"
 
 
 class ButtonListener(unohelper.Base, XActionListener):
@@ -162,18 +115,21 @@ class ButtonListener(unohelper.Base, XActionListener):
 
 	def actionPerformed(self, ev):
 		cmd = str(ev.ActionCommand)
+		print("****:", cmd)
 		if cmd == "ChooseEditor":
+			print(dir(self.cast))
 			ret = self.cast.chooseFile()
+			print("****", ret)
 			if ret:
 				path = uno.fileUrlToSystemPath(ret)
-				ev.Source.getContext().getControl("tf_Editor").setText(path)
+				ev.Source.getContext().getControl("tf_MathsPreviewPath").setText(path)
 
 # main class
 class OptionsDialogHandler(unohelper.Base, XContainerWindowEventHandler):
 	def __init__(self, ctx):
 		self.ctx = ctx
 		loadResourceResolver(self.ctx)
-		self.CfgNode = "/InsertFromMathsPreview.Settings/EditorKicker"
+		self.CfgNode = "/InsertFromMathsPreview.Settings/AllOptions"
 
 	# XContainerWindowEventHandler
 	def callHandlerMethod(self, window, eventObject, method):
@@ -201,18 +157,20 @@ class OptionsDialogHandler(unohelper.Base, XContainerWindowEventHandler):
 		name = window.getModel().Name
 		if name != "InsertFromMathsPreview_AllOptions":
 			return
-		editor = window.getControl("tf_Editor")
-		options = window.getControl("tf_Options")
-		header = window.getControl("tf_Header")
-		settings = {"names": ("EditorPath", "EditorArgs", "DefaultHeader"), "values": (editor.Text, options.Text, header.Text)}
+		editor  = window.getControl("tf_MathsPreviewPath")
+		options = window.getControl("tf_MathsFont")
+		settings = {"names": ("MathsPreviewPath", "MathsFont"), "values": (editor.Text, options.Text)}
 		print("Writing", settings)
 		self._configwriter(settings)
 
 	def _loadData(self, window, evName):
 		name = window.getModel().Name
+		print(name)
 		if name != "InsertFromMathsPreview_AllOptions":
+			print("error")
 			return
 		if evName == "initialize":
+			print("ok")
 			listener = ButtonListener(self)
 			btn_Choose = window.getControl("btn_Choose")
 			btn_Choose.ActionCommand = "ChooseEditor"
@@ -229,13 +187,10 @@ class OptionsDialogHandler(unohelper.Base, XContainerWindowEventHandler):
 		print(settings)
 
 		if settings:
-			tf_Editor = window.getControl("tf_Editor")
-			tf_Options = window.getControl("tf_Options")
-			tf_Header = window.getControl("tf_Header")
-			tf_Editor.setText(settings["EditorPath"])
-			tf_Options.setText(settings["EditorArgs"])
-			tf_Header.setText(settings["DefaultHeader"])
-		print("rre")
+			tf_MathsPreviewPath = window.getControl("tf_MathsPreviewPath")
+			tf_MathsFont = window.getControl("tf_MathsFont")
+			tf_MathsPreviewPath.setText(settings["MathsPreviewPath"])
+			tf_MathsFont.setText(settings["MathsFont"])
 		return
 
 	def _configreader(self):
@@ -258,18 +213,72 @@ class OptionsDialogHandler(unohelper.Base, XContainerWindowEventHandler):
 			raise e
 
 	def chooseFile(self):
-		# ret = self._getFileUrl()
-		# return ret
-		return ""
+		ret = self._getFileUrl()
+		return ret
 
-	# def _getFileUrl(self):
-	# 	url = FileOpenDialog(self.ctx,
-	# 						 template=FILEOPEN_SIMPLE,
-	# 						 filters=((RR.resolvestring('msg07'), '*.*'),
-	# 								  (RR.resolvestring('ek10'), '*.exe;*.bin;*.sh'))).execute()
-	# 	return url or False
+	def _getFileUrl(self):
+		url = FileOpenDialog(self.ctx,
+							 template=FILEOPEN_SIMPLE,
+							 filters=((RR.resolvestring('msg07'), '*.*'),
+									  (RR.resolvestring('ek10'), '*.exe;*.bin;*.sh'))).execute()
+		return url or False
 
 
 g_ImplementationHelper.addImplementation(
 	OptionsDialogHandler, ImplementationName, (ImplementationName,),)
+
+
+
+class DialogBase(object):
+    """ Base class for dialog. """
+    def __init__(self, ctx):
+        self.ctx = ctx
+        self.smgr = ctx.getServiceManager()
+
+    def create(self, name, arguments=None):
+        """ Create service instance. """
+        if arguments:
+            return self.smgr.createInstanceWithArgumentsAndContext(
+                name, arguments, self.ctx)
+        else:
+            return self.smgr.createInstanceWithContext(
+                name, self.ctx)
+
+
+class FileOpenDialog(DialogBase):
+    """ To get file url to open. """
+    def __init__(self, ctx, **kwds):
+        DialogBase.__init__(self, ctx)
+        self.args = kwds
+        AvailableServiceNames = self.ctx.getServiceManager().getAvailableServiceNames()
+        if "com.sun.star.ui.dialogs.SystemFilePicker" in AvailableServiceNames:
+            self.filepickerservice = "com.sun.star.ui.dialogs.SystemFilePicker"
+        elif "com.sun.star.ui.dialogs.GtkFilePicker" in AvailableServiceNames:
+            self.filepickerservice = "com.sun.star.ui.dialogs.GtkFilePicker"
+        else:
+            self.filepickerservice = "com.sun.star.ui.dialogs.FilePicker"
+
+    def execute(self):
+        fp = self.create(self.filepickerservice)
+        args = self.args
+        if "template" in args:
+            fp.initialize((args["template"],))
+        if "title" in args:
+            fp.setTitle(args["title"])
+        if "default" in args:
+            default = args["default"]
+            fp.setDefaultName(self._substitute_variables(default))
+        if "directory" in args:
+            fp.setDisplayDirectory(args["directory"])
+        if "filters" in args:
+            for title, filter in args["filters"]:
+                fp.appendFilter(title, filter)
+        result = None
+        if fp.execute():
+            result = fp.getFiles()[0]
+        return result
+
+    def _substitute_variables(self, uri):
+        return self.create("com.sun.star.util.PathSubstitution").\
+            substituteVariables(uri, True)
 

@@ -27,7 +27,7 @@ xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
                     <value>%origin%/../dialogs/all_options.xdl</value>
                 </prop>
                 <prop oor:name="EventHandlerService">
-                    <value>InsertFromMathsPreview.EditorKickerOptionsPage</value>
+                    <value>InsertFromMathsPreview.AllOptionsPage</value>
                 </prop>
                 <prop oor:name="GroupId">
                     <value></value>

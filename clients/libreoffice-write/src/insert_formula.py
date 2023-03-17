@@ -16,6 +16,7 @@ import json
 import tempfile
 import os
 import uuid
+from utils import *
 
 FORMATS = [
 	"svg",
@@ -24,40 +25,6 @@ FORMATS = [
 PATH_EXE = "~/bin/maths_preview"
 
 
-def createUnoService(service, ctx=None, args=None):
-    '''
-    Instanciate a Uno service.
-
-    @service: name of the service to be instanciated.
-    @ctx: the context if required.
-    @args: the arguments when needed.
-    '''
-    if not ctx:
-        ctx = uno.getComponentContext()
-    smgr = ctx.getServiceManager()
-    if ctx and args:
-        return smgr.createInstanceWithArgumentsAndContext(service, args, ctx)
-    elif args:
-        return smgr.createInstanceWithArguments(service, args)
-    elif ctx:
-        return smgr.createInstanceWithContext(service, ctx)
-    else:
-        return smgr.createInstance(service)
-
-
-def getConfigurationAccess(nodevalue, updatable=False):
-	'''
-	Access configuration value.
-
-	@nodevalue: the configuration key node as a string.
-	@updatable: set True when accessor needs to modify the key value.
-	'''
-	cp = createUnoService("com.sun.star.configuration.ConfigurationProvider")
-	node = PropertyValue("nodepath", 0, nodevalue, 0)
-	if updatable:
-		return cp.createInstanceWithArguments("com.sun.star.configuration.ConfigurationUpdateAccess", (node,))
-	else:
-		return cp.createInstanceWithArguments("com.sun.star.configuration.ConfigurationAccess", (node,))
 
 
 
@@ -68,7 +35,8 @@ def insert_inline_formula(*args):
 	insert_formula(block = False)
 
 def insert_formula(block):
-	print(get_apso_settings())
+	settings = get_apso_settings()
+	print(settings)
 	# create temporary file path
 	path = os.path.join(tempfile.gettempdir(), str(uuid.uuid4()))
 
@@ -85,22 +53,26 @@ def insert_formula(block):
 	cursor = doc.CurrentController.ViewCursor	
 	char_height = cursor.CharHeight
 
-	# Find potential graphics object in selection
-	content_enumeration = cursor.getText().createEnumeration()
-	while content_enumeration.hasMoreElements():
-		print(content_enumeration.nextElement())
+	additional_args = []
+	if settings["MathsFont"] is not None:
+		additional_args.extend(["-m", settings["MathsFont"],])
 
 	# Start program
-	result = subprocess.run([
-		os.path.expanduser(PATH_EXE), 
-		"-s", str(char_height),
-		"-f", "svg", 
-		"-d", 
-		"-o", path
-	], 
-		stdout = subprocess.PIPE, 
-		stderr = subprocess.PIPE,
-	)
+	try:
+		result = subprocess.run([
+			settings["MathsPreviewPath"], 
+			"-s", str(char_height),
+			"-f", "svg", 
+			"-d", 
+			"-o", path
+		] +  additional_args, 
+			stdout = subprocess.PIPE, 
+			stderr = subprocess.PIPE,
+		)
+	except FileNotFoundError as e:
+		msg_box("Executable could not launch ; check executable path in extension options\n{}".format(str(e)))
+		return
+
 	stdout = result.stdout.decode("utf-8") 
 	stderr = result.stderr.decode("utf-8") 
 	print(stdout)
@@ -229,8 +201,14 @@ def get_apso_settings():
         props = group.ElementNames
         values = group.getPropertyValues(props)
         settings.update({k: v for k, v in zip(props, values)})
-    if settings["EditorPath"].strip() == "":
-        settings["EditorPath"] = settings["EditorPath"].strip()
-    if settings["EditorArgs"].strip() == "":
-        settings["EditorArgs"] = "{FILENAME}"
+
+    default_settings = {
+    	"MathsPreviewPath" : "~/bin/maths_preview",
+    	"MathsFont"        : None,
+    }
+
+    for k, v in settings.items():
+    	if v is None or v.strip() == "":
+    		settings[k] = default_settings[k]
+
     return settings
