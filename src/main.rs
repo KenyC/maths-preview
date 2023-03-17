@@ -528,6 +528,7 @@ fn layout_and_size<'a, 'f>(font: &'f TtfMathFont<'a>, font_size : f64, formula: 
 fn scale_and_center(bbox: BBox, context: &Context, canvas_size: (f64, f64)) {
     let width   = bbox.width();
     let height  = bbox.height();
+    if width <= 0. || height < 0. {return;}
     let (canvas_width, canvas_height) = canvas_size;
     let BBox { x_min, y_min, x_max, y_max } = bbox;
     let midx = 0.5 * (x_min + x_max);
