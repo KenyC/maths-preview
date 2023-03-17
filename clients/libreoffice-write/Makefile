@@ -13,6 +13,7 @@ zip:
 		META-INF/manifest.xml \
 		Addons.xcu \
 		src/insert_formula.py \
+		images/*.png \
 		package/license.txt 
 
 install:

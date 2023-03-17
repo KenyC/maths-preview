@@ -5,13 +5,8 @@
     <name>Insert From MathsPreview</name>
   </display-name>
   <icon>
-    <default xlink:href="images/formula.svg" />
+    <default xlink:href="images/formula.png" />
   </icon>
-<!--   
-  <icon>
-    <default xlink:href="icons/texmaths.svg" />
-  </icon>
- -->  
   <version value="0.1"/>
   <dependencies>
     <!-- <l:LibreOffice-minimal-version value="4.0" d:name="LibreOffice.org or Open Office 4.0" /> -->

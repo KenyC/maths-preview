@@ -1,59 +1,63 @@
-<?xml version='1.0' encoding='UTF-8'?>
-<oor:component-data 
- xmlns:oor="http://openoffice.org/2001/registry"
- xmlns:xs="http://www.w3.org/2001/XMLSchema"
- oor:name="Addons"
- oor:package="org.openoffice.Office">
-    <node oor:name="AddonUI">
-        <node oor:name="OfficeToolBar">
-            <node oor:name="InsertFromMathsPreview.OfficeToolBar" oor:op="replace">
-                <node oor:name="m1" oor:op="replace"> 
-                    <prop oor:name="Context" oor:type="xs:string">
-                        <value>com.sun.star.text.TextDocument</value>
-                    </prop>
-                    <prop oor:name="URL" oor:type="xs:string">
-                        <value>vnd.sun.star.script:insert_from_maths_preview.oxt|src|insert_formula.py$insert_block_formula?language=Python&amp;location=user:uno_packages</value>
-                    </prop>
-                    <prop oor:name="ImageIdentifier" oor:type="xs:string">
-                        <value>%origin%/images/formula.png</value>
-                    </prop>
-                    <prop oor:name="Title" oor:type="xs:string">
-                        <value>Block Formula</value>
-                        <!-- 
-                        <value xml:lang="fr"></value>
-                        <value xml:lang="de"></value>
-                        <value xml:lang="es"></value>
-                        <value xml:lang="pt-BR"></value>
-                         -->
-                    </prop>
-                    <prop oor:name="Target" oor:type="xs:string">
-                        <value>_self</value>
-                    </prop>
-                </node>
-                <node oor:name="m2" oor:op="replace"> 
-                    <prop oor:name="Context" oor:type="xs:string">
-                        <value>com.sun.star.text.TextDocument</value>
-                    </prop>
-                    <prop oor:name="URL" oor:type="xs:string">
-                        <value>vnd.sun.star.script:insert_from_maths_preview.oxt|src|insert_formula.py$insert_inline_formula?language=Python&amp;location=user:uno_packages</value>
-                    </prop>
-                    <prop oor:name="ImageIdentifier" oor:type="xs:string">
-                        <value>%origin%/images/formula.png</value>
-                    </prop>
-                    <prop oor:name="Title" oor:type="xs:string">
-                        <value>Inline Formula</value>
-                        <!-- 
-                        <value xml:lang="fr"></value>
-                        <value xml:lang="de"></value>
-                        <value xml:lang="es"></value>
-                        <value xml:lang="pt-BR"></value>
-                         -->
-                    </prop>
-                    <prop oor:name="Target" oor:type="xs:string">
-                        <value>_self</value>
-                    </prop>
-                </node>
+<?xml version="1.0" encoding="UTF-8"?>
+<oor:component-data xmlns:oor="http://openoffice.org/2001/registry" 
+ xmlns:xs="http://www.w3.org/2001/XMLSchema" 
+ oor:name="Addons" oor:package="org.openoffice.Office">
+   <node oor:name="AddonUI">
+      <node oor:name="OfficeToolBar">
+         <node oor:name="com.libreoffice.kenyc.insertfrommathpreview.toolbar" oor:op="replace">
+            <node oor:name="BLOCK" oor:op="replace">
+               <prop oor:name="Context" oor:type="xs:string">
+                  <value>com.sun.star.text.TextDocument</value>
+               </prop>
+               <prop oor:name="Title" oor:type="xs:string">
+                  <value xml:lang="en">Insert block formula in document.</value>
+               </prop>
+               <prop oor:name="URL" oor:type="xs:string">
+                  <value>vnd.sun.star.script:insert_from_maths_preview.oxt|src|insert_formula.py$insert_block_formula?language=Python&amp;location=user:uno_packages</value>
+               </prop>
+               <prop oor:name="Target" oor:type="xs:string">
+                  <value>_self</value>
+               </prop>
             </node>
-        </node>
-    </node>
+            <node oor:name="INLINE" oor:op="replace">
+               <prop oor:name="Context" oor:type="xs:string">
+                  <value>com.sun.star.text.TextDocument</value>
+               </prop>
+               <prop oor:name="Title" oor:type="xs:string">
+                  <value xml:lang="en">Insert inline formula in document.</value>
+               </prop>
+               <prop oor:name="URL" oor:type="xs:string">
+                  <value>vnd.sun.star.script:insert_from_maths_preview.oxt|src|insert_formula.py$insert_inline_formula?language=Python&amp;location=user:uno_packages</value>
+               </prop>
+               <prop oor:name="Target" oor:type="xs:string">
+                  <value>_self</value>
+               </prop>
+            </node>
+         </node>
+      </node>
+
+      <node oor:name="Images">
+         <node oor:name="com.libreoffice.kenyc.insertfrommathpreview.BLOCK" oor:op="replace">
+            <prop oor:name="URL" oor:type="xs:string">
+               <value>vnd.sun.star.script:insert_from_maths_preview.oxt|src|insert_formula.py$insert_block_formula?language=Python&amp;location=user:uno_packages</value>
+            </prop>
+            <node oor:name="UserDefinedImages">
+               <prop oor:name="ImageSmallURL" oor:type="xs:string">
+                  <value>%origin%/images/block.png</value>
+               </prop>
+            </node>
+         </node>
+         <node oor:name="com.libreoffice.kenyc.insertfrommathpreview.INLINE" oor:op="replace">
+            <prop oor:name="URL" oor:type="xs:string">
+               <value>vnd.sun.star.script:insert_from_maths_preview.oxt|src|insert_formula.py$insert_inline_formula?language=Python&amp;location=user:uno_packages</value>
+            </prop>
+            <node oor:name="UserDefinedImages">
+               <prop oor:name="ImageSmallURL" oor:type="xs:string">
+                  <value>%origin%/images/inline.png</value>
+               </prop>
+            </node>
+         </node>
+      </node>
+
+   </node>
 </oor:component-data>
