@@ -57,19 +57,15 @@ ImplementationName = "InsertFromMathsPreview.AllOptionsPage"
 
 
 class ButtonListener(unohelper.Base, XActionListener):
-	def __init__(self, cast):
-		self.cast = cast
+	def __init__(self, cast, closure):
+		self.cast    = cast
+		self.closure = closure
 
 	def disposing(self, ev):
 		pass
 
 	def actionPerformed(self, ev):
-		cmd = str(ev.ActionCommand)
-		if cmd == "ChooseEditor":
-			ret = self.cast.chooseFile()
-			if ret:
-				path = uno.fileUrlToSystemPath(ret)
-				ev.Source.getContext().getControl("tf_MathsPreviewPath").setText(path)
+		self.closure(self.cast, ev)
 
 
 class OptionsDialogHandler(unohelper.Base, XContainerWindowEventHandler):
@@ -107,7 +103,6 @@ class OptionsDialogHandler(unohelper.Base, XContainerWindowEventHandler):
 		editor  = window.getControl("tf_MathsPreviewPath")
 		options = window.getControl("tf_MathsFont")
 		settings = {"names": ("MathsPreviewPath", "MathsFont"), "values": (editor.Text, options.Text)}
-		print("Writing", settings)
 		self._configwriter(settings)
 
 	def _loadData(self, window, evName):
@@ -115,10 +110,7 @@ class OptionsDialogHandler(unohelper.Base, XContainerWindowEventHandler):
 		if name != "InsertFromMathsPreview_AllOptions":
 			return
 		if evName == "initialize":
-			listener = ButtonListener(self)
-			btn_Choose = window.getControl("btn_Choose")
-			btn_Choose.ActionCommand = "ChooseEditor"
-			btn_Choose.addActionListener(listener)
+			self.setup_buttons(window)
 			for control in window.Controls:
 				if not control.supportsService("com.sun.star.awt.UnoControlEdit"):
 					model = control.Model
@@ -134,6 +126,30 @@ class OptionsDialogHandler(unohelper.Base, XContainerWindowEventHandler):
 			tf_MathsPreviewPath.setText(settings["MathsPreviewPath"])
 			tf_MathsFont.setText(settings["MathsFont"])
 		return
+
+	def setup_buttons(self, window):
+		exe_filters = (
+			(RR.resolvestring('msg07'), '*.*'),
+			(RR.resolvestring('ek10'), '*.exe;*.bin;*.sh')
+		)
+		listener = ButtonListener(self, lambda obj, ev: 
+			obj.chooseFile(ev, exe_filters, "tf_MathsPreviewPath") if str(ev.ActionCommand) == "ChooseEditor" else None
+		)
+		btn_PickExe = window.getControl("btn_PickExe")
+		btn_PickExe.ActionCommand = "ChooseEditor"
+		btn_PickExe.addActionListener(listener)
+
+		otf_filters = (
+			(RR.resolvestring('msg07'), '*.*'),
+			(RR.resolvestring('ek11'),  '*.otf')
+		)
+		listener = ButtonListener(self, lambda obj, ev: 
+			obj.chooseFile(ev, otf_filters, "tf_MathsFont") if str(ev.ActionCommand) == "ChooseEditor" else None
+		)
+		btn_PickExe = window.getControl("btn_PickFont")
+		btn_PickExe.ActionCommand = "ChooseEditor"
+		btn_PickExe.addActionListener(listener)
+
 
 	def _configreader(self):
 		settings = {}
@@ -154,17 +170,16 @@ class OptionsDialogHandler(unohelper.Base, XContainerWindowEventHandler):
 		except Exception as e:
 			raise e
 
-	def chooseFile(self):
-		ret = self._getFileUrl()
-		return ret
+	def chooseFile(self, ev, filters, field_name):
+		url = FileOpenDialog(
+			self.ctx,
+			template=FILEOPEN_SIMPLE,
+			filters=filters
+		).execute()
 
-	def _getFileUrl(self):
-		url = FileOpenDialog(self.ctx,
-							 template=FILEOPEN_SIMPLE,
-							 filters=((RR.resolvestring('msg07'), '*.*'),
-									  (RR.resolvestring('ek10'), '*.exe;*.bin;*.sh'))).execute()
-		return url or False
-
+		if url:
+			path = uno.fileUrlToSystemPath(url)
+			ev.Source.getContext().getControl(field_name).setText(path)
 
 g_ImplementationHelper.addImplementation(
 	OptionsDialogHandler, ImplementationName, (ImplementationName,),)
