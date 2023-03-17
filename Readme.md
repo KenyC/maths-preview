@@ -77,3 +77,17 @@ Under `clients/libreoffice-writer`, run `make`. This will zip the add-on and aut
   - Write the formula and exit the window, by using e.g. Esc.
   - The formula you typed is inserted in the document. 
 
+#### Adding keyboard shortcuts (aka accelerators)
+
+  - Go to  `Tools > Customize ...`. 
+  - Click on the `Keyboard` tab. 
+  - You'll see a list of keys at the top and a list of functions at the bottom. In the `Category` list at the bottom, navigate to `LibreOffice Macros > My Macros > InsertFromMathsPreview.oxt > insert_formula`.
+  - A list of functions appears in the bottom middle panel. The two relevant funtions are `insert_inline_formula` and `insert_block_formula`. Click on the one you want to assign a keyboard shortcut to.
+  - Click on the key combination you want the function assigned to in the upper panel.
+  - In the right panel, click on `Modify`.
+
+
+<p align="center"><img src="screenshots/assign_keyboardshortcuts_in_libreoffice_write.png" alt="Screenshot illustrating how to assign keyboard shortcuts in LibreOffice Writer" width="50%"/></p>
+
+
+

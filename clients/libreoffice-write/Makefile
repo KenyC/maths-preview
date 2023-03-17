@@ -1,4 +1,4 @@
-NAME=insert_from_maths_preview
+NAME=InsertFromMathsPreview
 OUTPUT=$(NAME).oxt
 
 all:	clean zip install
