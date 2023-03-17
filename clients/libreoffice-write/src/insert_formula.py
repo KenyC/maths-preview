@@ -23,6 +23,44 @@ FORMATS = [
 ]
 PATH_EXE = "~/bin/maths_preview"
 
+
+def createUnoService(service, ctx=None, args=None):
+    '''
+    Instanciate a Uno service.
+
+    @service: name of the service to be instanciated.
+    @ctx: the context if required.
+    @args: the arguments when needed.
+    '''
+    if not ctx:
+        ctx = uno.getComponentContext()
+    smgr = ctx.getServiceManager()
+    if ctx and args:
+        return smgr.createInstanceWithArgumentsAndContext(service, args, ctx)
+    elif args:
+        return smgr.createInstanceWithArguments(service, args)
+    elif ctx:
+        return smgr.createInstanceWithContext(service, ctx)
+    else:
+        return smgr.createInstance(service)
+
+
+def getConfigurationAccess(nodevalue, updatable=False):
+	'''
+	Access configuration value.
+
+	@nodevalue: the configuration key node as a string.
+	@updatable: set True when accessor needs to modify the key value.
+	'''
+	cp = createUnoService("com.sun.star.configuration.ConfigurationProvider")
+	node = PropertyValue("nodepath", 0, nodevalue, 0)
+	if updatable:
+		return cp.createInstanceWithArguments("com.sun.star.configuration.ConfigurationUpdateAccess", (node,))
+	else:
+		return cp.createInstanceWithArguments("com.sun.star.configuration.ConfigurationAccess", (node,))
+
+
+
 def insert_block_formula(*args):
 	insert_formula(block = True)
 
@@ -30,6 +68,7 @@ def insert_inline_formula(*args):
 	insert_formula(block = False)
 
 def insert_formula(block):
+	print(get_apso_settings())
 	# create temporary file path
 	path = os.path.join(tempfile.gettempdir(), str(uuid.uuid4()))
 
@@ -172,9 +211,26 @@ def add_embedded_image(cursor, graphic_provider, doc, path, description, baselin
 
 
 def msg_box(text):
-    myBox = msgbox.MsgBox(XSCRIPTCONTEXT.getComponentContext())
-    myBox.addButton("OK")
-    myBox.renderFromButtonSize()
-    myBox.numberOflines = 2
-    myBox.show(text,0,"Watching")
+	myBox = msgbox.MsgBox(XSCRIPTCONTEXT.getComponentContext())
+	myBox.addButton("OK")
+	myBox.renderFromButtonSize()
+	myBox.numberOflines = 2
+	myBox.show(text,0,"Watching")
 
+
+
+def get_apso_settings():
+    key = "/InsertFromMathsPreview.Settings"
+    reader = getConfigurationAccess(key)
+    groupnames = reader.ElementNames
+    settings = {}
+    for groupname in groupnames:
+        group = reader.getByName(groupname)
+        props = group.ElementNames
+        values = group.getPropertyValues(props)
+        settings.update({k: v for k, v in zip(props, values)})
+    if settings["EditorPath"].strip() == "":
+        settings["EditorPath"] = settings["EditorPath"].strip()
+    if settings["EditorArgs"].strip() == "":
+        settings["EditorArgs"] = "{FILENAME}"
+    return settings

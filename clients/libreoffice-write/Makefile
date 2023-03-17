@@ -12,11 +12,14 @@ zip:
 		description.xml \
 		META-INF/manifest.xml \
 		Addons.xcu \
-		src/insert_formula.py \
 		images/*.png \
+		src/* \
+		config/* \
+		dialogs/* \
 		package/license.txt 
 
 install:
+	unopkg validate $(OUTPUT)
 	unopkg add $(OUTPUT)
 
 validate:

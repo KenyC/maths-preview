@@ -1,0 +1,53 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<oor:component-schema oor:name="Settings" oor:package="InsertFromMathsPreview" xml:ang="en-US" xmlns:oor="http://openoffice.org/2001/registry" 
+xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+    <templates/>
+    <component>
+        <group oor:name="EditorKicker">
+            <prop oor:name="EditorPath" oor:type="xs:string">
+                <info>
+                    <desc>Path to preferred code editor.</desc>
+                </info>
+            </prop>
+            <prop oor:name="EditorArgs" oor:type="xs:string">
+                <info>
+                    <desc>Row and column agruments to pass to editor executable.</desc>
+                </info>
+            </prop>
+            <prop oor:name="DefaultHeader" oor:type="xs:string">
+                <info>
+                    <desc>Default text for new scripts.</desc>
+                </info>
+            </prop>
+        </group>
+        <group oor:name="History">
+            <prop oor:name="SaveLastScript" oor:type="xs:boolean">
+                <info>
+                    <desc>Keep history of the last executed script.</desc>
+                </info>
+            </prop>
+            <prop oor:name="SaveTreeState" oor:type="xs:boolean">
+                <info>
+                    <desc>Keep history of exapnded nodes.</desc>
+                </info>
+            </prop>
+            <prop oor:name="UnloadChildsOnCollapse" oor:type="xs:boolean">
+                <info>
+                    <desc>All expanded childs collapse with parent node.</desc>
+                </info>
+            </prop>
+        </group>
+        <group oor:name="Logging">
+            <prop oor:name="LogLevel" oor:type="xs:short">
+                <info>
+                    <desc>Set logging level: 0 = WARNING, 1 = INFO, 2 = DEBUG.</desc>
+                </info>
+            </prop>
+            <prop oor:name="LogToFile" oor:type="xs:short">
+                <info>
+                    <desc>0 = log to stdout, 1 = log to file.</desc>
+                </info>
+            </prop>
+        </group>
+    </component>
+</oor:component-schema>
