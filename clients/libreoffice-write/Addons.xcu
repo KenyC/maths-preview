@@ -13,7 +13,7 @@
                   <value xml:lang="en">Insert block formula in document.</value>
                </prop>
                <prop oor:name="URL" oor:type="xs:string">
-                  <value>vnd.sun.star.script:insert_from_maths_preview.oxt|src|insert_formula.py$insert_block_formula?language=Python&amp;location=user:uno_packages</value>
+                  <value>vnd.sun.star.script:InsertFromMathsPreview.oxt|src|insert_formula.py$insert_block_formula?language=Python&amp;location=user:uno_packages</value>
                </prop>
                <prop oor:name="Target" oor:type="xs:string">
                   <value>_self</value>
@@ -27,7 +27,7 @@
                   <value xml:lang="en">Insert inline formula in document.</value>
                </prop>
                <prop oor:name="URL" oor:type="xs:string">
-                  <value>vnd.sun.star.script:insert_from_maths_preview.oxt|src|insert_formula.py$insert_inline_formula?language=Python&amp;location=user:uno_packages</value>
+                  <value>vnd.sun.star.script:InsertFromMathsPreview.oxt|src|insert_formula.py$insert_inline_formula?language=Python&amp;location=user:uno_packages</value>
                </prop>
                <prop oor:name="Target" oor:type="xs:string">
                   <value>_self</value>
@@ -39,7 +39,7 @@
       <node oor:name="Images">
          <node oor:name="com.libreoffice.kenyc.insertfrommathpreview.BLOCK" oor:op="replace">
             <prop oor:name="URL" oor:type="xs:string">
-               <value>vnd.sun.star.script:insert_from_maths_preview.oxt|src|insert_formula.py$insert_block_formula?language=Python&amp;location=user:uno_packages</value>
+               <value>vnd.sun.star.script:InsertFromMathsPreview.oxt|src|insert_formula.py$insert_block_formula?language=Python&amp;location=user:uno_packages</value>
             </prop>
             <node oor:name="UserDefinedImages">
                <prop oor:name="ImageSmallURL" oor:type="xs:string">
@@ -49,7 +49,7 @@
          </node>
          <node oor:name="com.libreoffice.kenyc.insertfrommathpreview.INLINE" oor:op="replace">
             <prop oor:name="URL" oor:type="xs:string">
-               <value>vnd.sun.star.script:insert_from_maths_preview.oxt|src|insert_formula.py$insert_inline_formula?language=Python&amp;location=user:uno_packages</value>
+               <value>vnd.sun.star.script:InsertFromMathsPreview.oxt|src|insert_formula.py$insert_inline_formula?language=Python&amp;location=user:uno_packages</value>
             </prop>
             <node oor:name="UserDefinedImages">
                <prop oor:name="ImageSmallURL" oor:type="xs:string">
