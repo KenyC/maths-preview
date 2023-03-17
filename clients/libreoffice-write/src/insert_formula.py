@@ -70,24 +70,26 @@ def insert_formula(block):
 	
 	metainfo = launch_maths_preview(settings["MathsPreviewPath"], char_height, path, maths_font = settings.get("MathsFont"), initial_formula = initial_formula)
 	assert(metainfo is not None)
+	width_pt  = metainfo["metrics"]["bbox"]["x_max"] - metainfo["metrics"]["bbox"]["x_min"] 
+	height_pt = metainfo["metrics"]["bbox"]["y_max"] - metainfo["metrics"]["bbox"]["y_min"]
 
 	#######################################
 	# INSERT GRAPHICS
 	#######################################
 
-	graphic_object_shape = create_graphic_object_shape_from_path(doc, graphic_provider, path)
+	graphic = create_graphic_object_shape_from_path(doc, graphic_provider, path)
 
 	description = metainfo["formula"]
 	is_new_text_graphic_object = text_graphic_object is None
 	if is_new_text_graphic_object:
 		text_graphic_object = doc.createInstance("com.sun.star.text.TextGraphicObject")
 
-	fill_text_graphic_object_with_shape(text_graphic_object, graphic_object_shape, description)
+	fill_text_graphic_object_with_shape(text_graphic_object, graphic, width_pt, height_pt, description)
 	
 	if block:
 		make_block(text_graphic_object)
 	else:
-		baseline_percentage = metainfo["metrics"]["baseline"] / (metainfo["metrics"]["bbox"]["y_max"] - metainfo["metrics"]["bbox"]["y_min"]) 
+		baseline_percentage = metainfo["metrics"]["baseline"] / height_pt
 		make_inline(text_graphic_object, baseline_percentage)
 
 
@@ -149,18 +151,8 @@ def create_graphic_object_shape_from_path(doc, graphic_provider, path,):
 		msg_box("No file was returned by the program!")
 		return
 		
-	if graphic.SizePixel is None:
-		# Then we're likely dealing with vector graphics. Then we try to
-		# get the "real" size, which is enough information to
-		# determine the aspect ratio
-		original_size = graphic.Size100thMM
-	else:
-		original_size = graphic.SizePixel
 
-	graphic_object_shape = doc.createInstance('com.sun.star.drawing.GraphicObjectShape')
-	graphic_object_shape.Graphic = graphic
-
-	return graphic_object_shape
+	return graphic
 
 
 
@@ -168,12 +160,13 @@ def create_graphic_object_shape_from_path(doc, graphic_provider, path,):
 
 
 
-def fill_text_graphic_object_with_shape(text_graphic_object, graphic_object_shape, description = None, dpi = 1.0):
-	scale = 10 * 2.54 / float(dpi) # this seems like the good ratio, I have no idea why!
-	original_size = graphic_object_shape.Graphic.SizePixel
-	size = Size(int(original_size.Width * scale), original_size.Height * scale)
+def fill_text_graphic_object_with_shape(text_graphic_object, graphic, width_pt, height_pt, description = None):
+	# desired unit is 1/100mm
+	# 1 DTP = 1 / 72 in = 0.3527778mm = 35.27778 1/100mm
+	one100th_mm_per_dot = 35.27778
+	size = Size(round(width_pt * one100th_mm_per_dot), round(height_pt * one100th_mm_per_dot))
 
-	text_graphic_object.Graphic = graphic_object_shape.Graphic
+	text_graphic_object.Graphic = graphic
 	text_graphic_object.setSize(size)
 
 	if description is not None:
