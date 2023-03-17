@@ -44,6 +44,139 @@ EXTID = 'org.kenyc.intsertfrommathspreview'
 
 
 
+
+
+#######################################
+# CONFIGURATION DIALOG 
+#######################################
+
+# uno implementation
+g_ImplementationHelper = unohelper.ImplementationHelper()
+
+ImplementationName = "InsertFromMathsPreview.AllOptionsPage"
+
+
+class ButtonListener(unohelper.Base, XActionListener):
+	def __init__(self, cast):
+		self.cast = cast
+
+	def disposing(self, ev):
+		pass
+
+	def actionPerformed(self, ev):
+		cmd = str(ev.ActionCommand)
+		if cmd == "ChooseEditor":
+			ret = self.cast.chooseFile()
+			if ret:
+				path = uno.fileUrlToSystemPath(ret)
+				ev.Source.getContext().getControl("tf_MathsPreviewPath").setText(path)
+
+
+class OptionsDialogHandler(unohelper.Base, XContainerWindowEventHandler):
+	def __init__(self, ctx):
+		self.ctx = ctx
+		loadResourceResolver(self.ctx)
+		self.CfgNode = "/InsertFromMathsPreview.Settings/AllOptions"
+
+	# XContainerWindowEventHandler
+	def callHandlerMethod(self, window, eventObject, method):
+		if method == "external_event":
+			try:
+				self._handleExternalEvent(window, eventObject)
+			except Exception as e:
+				print(e)
+			return True
+
+	# XContainerWindowEventHandler
+	def getSupportedMethodNames(self):
+		return ("external_event",)
+
+	def _handleExternalEvent(self, window, evName):
+		if evName == "ok":
+			self._saveData(window)
+		elif evName == "back":
+			self._loadData(window, "back")
+		elif evName == "initialize":
+			self._loadData(window, "initialize")
+		return True
+
+	def _saveData(self, window):
+		name = window.getModel().Name
+		if name != "InsertFromMathsPreview_AllOptions":
+			return
+		editor  = window.getControl("tf_MathsPreviewPath")
+		options = window.getControl("tf_MathsFont")
+		settings = {"names": ("MathsPreviewPath", "MathsFont"), "values": (editor.Text, options.Text)}
+		print("Writing", settings)
+		self._configwriter(settings)
+
+	def _loadData(self, window, evName):
+		name = window.getModel().Name
+		if name != "InsertFromMathsPreview_AllOptions":
+			return
+		if evName == "initialize":
+			listener = ButtonListener(self)
+			btn_Choose = window.getControl("btn_Choose")
+			btn_Choose.ActionCommand = "ChooseEditor"
+			btn_Choose.addActionListener(listener)
+			for control in window.Controls:
+				if not control.supportsService("com.sun.star.awt.UnoControlEdit"):
+					model = control.Model
+					model.Label = RR.resolvestring(model.Label)
+		settings = self._configreader()
+		for k, v in settings.items():
+			if v is None:
+				settings[k] = ""
+
+		if settings:
+			tf_MathsPreviewPath = window.getControl("tf_MathsPreviewPath")
+			tf_MathsFont = window.getControl("tf_MathsFont")
+			tf_MathsPreviewPath.setText(settings["MathsPreviewPath"])
+			tf_MathsFont.setText(settings["MathsFont"])
+		return
+
+	def _configreader(self):
+		settings = {}
+		try:
+			reader = getConfigurationAccess(self.CfgNode)
+			names = reader.ElementNames
+			values = reader.getPropertyValues(names)
+			settings = {k: v for k, v in zip(names, values)}
+		except Exception as e:
+			raise e
+		return settings
+
+	def _configwriter(self, settings):
+		try:
+			writer = getConfigurationAccess(self.CfgNode, True)
+			writer.setPropertyValues(settings["names"], settings["values"])
+			writer.commitChanges()
+		except Exception as e:
+			raise e
+
+	def chooseFile(self):
+		ret = self._getFileUrl()
+		return ret
+
+	def _getFileUrl(self):
+		url = FileOpenDialog(self.ctx,
+							 template=FILEOPEN_SIMPLE,
+							 filters=((RR.resolvestring('msg07'), '*.*'),
+									  (RR.resolvestring('ek10'), '*.exe;*.bin;*.sh'))).execute()
+		return url or False
+
+
+g_ImplementationHelper.addImplementation(
+	OptionsDialogHandler, ImplementationName, (ImplementationName,),)
+
+
+#######################################
+# VARIOUS UTILS
+#######################################
+
+
+
+
 class ResourceResolver(object):
 	'''Resource Resolver for localized strings'''
 	def __init__(self, ctx):
@@ -88,144 +221,10 @@ class ResourceResolver(object):
 
 
 def loadResourceResolver(ctx):
-	print("!!!!!!!!!!!!!!!!!!!")
 	global RR
 	if not RR:
 		RR = ResourceResolver(ctx)
 
-
-
-
-# -----------------------------------------------------------
-# EDITOR KICKER
-# -----------------------------------------------------------
-
-# uno implementation
-g_ImplementationHelper = unohelper.ImplementationHelper()
-
-ImplementationName = "InsertFromMathsPreview.AllOptionsPage"
-
-
-class ButtonListener(unohelper.Base, XActionListener):
-	def __init__(self, cast):
-		self.cast = cast
-
-	def disposing(self, ev):
-		pass
-
-	def actionPerformed(self, ev):
-		cmd = str(ev.ActionCommand)
-		print("****:", cmd)
-		if cmd == "ChooseEditor":
-			print(dir(self.cast))
-			ret = self.cast.chooseFile()
-			print("****", ret)
-			if ret:
-				path = uno.fileUrlToSystemPath(ret)
-				ev.Source.getContext().getControl("tf_MathsPreviewPath").setText(path)
-
-# main class
-class OptionsDialogHandler(unohelper.Base, XContainerWindowEventHandler):
-	def __init__(self, ctx):
-		self.ctx = ctx
-		loadResourceResolver(self.ctx)
-		self.CfgNode = "/InsertFromMathsPreview.Settings/AllOptions"
-
-	# XContainerWindowEventHandler
-	def callHandlerMethod(self, window, eventObject, method):
-		if method == "external_event":
-			try:
-				self._handleExternalEvent(window, eventObject)
-			except Exception as e:
-				print(e)
-			return True
-
-	# XContainerWindowEventHandler
-	def getSupportedMethodNames(self):
-		return ("external_event",)
-
-	def _handleExternalEvent(self, window, evName):
-		if evName == "ok":
-			self._saveData(window)
-		elif evName == "back":
-			self._loadData(window, "back")
-		elif evName == "initialize":
-			self._loadData(window, "initialize")
-		return True
-
-	def _saveData(self, window):
-		name = window.getModel().Name
-		if name != "InsertFromMathsPreview_AllOptions":
-			return
-		editor  = window.getControl("tf_MathsPreviewPath")
-		options = window.getControl("tf_MathsFont")
-		settings = {"names": ("MathsPreviewPath", "MathsFont"), "values": (editor.Text, options.Text)}
-		print("Writing", settings)
-		self._configwriter(settings)
-
-	def _loadData(self, window, evName):
-		name = window.getModel().Name
-		print(name)
-		if name != "InsertFromMathsPreview_AllOptions":
-			print("error")
-			return
-		if evName == "initialize":
-			print("ok")
-			listener = ButtonListener(self)
-			btn_Choose = window.getControl("btn_Choose")
-			btn_Choose.ActionCommand = "ChooseEditor"
-			btn_Choose.addActionListener(listener)
-			for control in window.Controls:
-				if not control.supportsService("com.sun.star.awt.UnoControlEdit"):
-					model = control.Model
-					model.Label = RR.resolvestring(model.Label)
-		settings = self._configreader()
-		print(settings)
-		for k, v in settings.items():
-			if v is None:
-				settings[k] = ""
-		print(settings)
-
-		if settings:
-			tf_MathsPreviewPath = window.getControl("tf_MathsPreviewPath")
-			tf_MathsFont = window.getControl("tf_MathsFont")
-			tf_MathsPreviewPath.setText(settings["MathsPreviewPath"])
-			tf_MathsFont.setText(settings["MathsFont"])
-		return
-
-	def _configreader(self):
-		settings = {}
-		try:
-			reader = getConfigurationAccess(self.CfgNode)
-			names = reader.ElementNames
-			values = reader.getPropertyValues(names)
-			settings = {k: v for k, v in zip(names, values)}
-		except Exception as e:
-			raise e
-		return settings
-
-	def _configwriter(self, settings):
-		try:
-			writer = getConfigurationAccess(self.CfgNode, True)
-			writer.setPropertyValues(settings["names"], settings["values"])
-			writer.commitChanges()
-		except Exception as e:
-			raise e
-
-	def chooseFile(self):
-		ret = self._getFileUrl()
-		return ret
-
-	def _getFileUrl(self):
-		url = FileOpenDialog(self.ctx,
-							 template=FILEOPEN_SIMPLE,
-							 filters=((RR.resolvestring('msg07'), '*.*'),
-									  (RR.resolvestring('ek10'), '*.exe;*.bin;*.sh'))).execute()
-		return url or False
-
-
-g_ImplementationHelper.addImplementation(
-	OptionsDialogHandler, ImplementationName, (ImplementationName,),)
 
 
 
