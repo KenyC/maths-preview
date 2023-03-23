@@ -1,22 +1,22 @@
 use std::cell::{RefCell, Cell};
 use std::io::Write;
-use std::ops::{Deref, DerefMut};
+use std::ops::Deref;
 use std::path::PathBuf;
 use std::rc::Rc;
 
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use serde_json;
 
 use cairo::glib::VariantDict;
 use gtk::cairo::Context;
 use gtk::gio::SimpleAction;
 use gtk::glib::clone;
-use gtk::{prelude::*, TextView, DrawingArea, glib, Button};
+use gtk::{prelude::*, TextView, DrawingArea, glib, Button, Statusbar, Entry};
 use gtk::{Application, ApplicationWindow};
 
 use rex::error::{FontError, LayoutError};
 use rex::layout::Grid;
-use rex::{Renderer, GraphicsBackend, FontBackend, Backend};
+use rex::Renderer;
 use rex::font::FontContext;
 use rex::font::backend::ttf_parser::TtfMathFont;
 use rex::parser::parse;
@@ -65,11 +65,34 @@ impl Default for Output {
 #[derive(Debug,)]
 enum AppError {
     CouldNotGetTextBuffer,
-    ParseError,
+    ParseError(String),
     IOError(std::io::Error),
     CairoError(cairo::Error),
     FontError(FontError),
     LayoutError(LayoutError),
+}
+
+impl AppError {
+    fn human_readable(&self) -> String {
+        let error_tag = match self {
+            AppError::FontError(_) |
+            AppError::LayoutError(LayoutError::Font(_)) => "Font Error",
+            AppError::ParseError(_) => "Parse Error",
+
+            _ => "App-internal Error",
+        };
+
+        let error_message = match self {
+            AppError::CouldNotGetTextBuffer => "could not get text buffer".to_string(),
+            AppError::ParseError(e)  => format!("{}", e),
+            AppError::IOError(e)     => format!("{}", e),
+            AppError::CairoError(e)  => format!("{}", e),
+            AppError::FontError(e)   |
+            AppError::LayoutError(LayoutError::Font(e)) => format!("{}", e),
+        };
+
+        format!("{} : {}", error_tag, error_message)
+    }
 }
 
 type AppResult<A> = Result<A, AppError>;
@@ -297,86 +320,95 @@ fn build_ui(app : &Application, font : TtfMathFont<'static>, app_context : AppCo
 
 
 
-    let text_field = TextView::builder()
-        .vexpand(true)
+    let text_field = Entry::builder()
+        .valign(gtk::Align::Center)
         .build()
     ;
 
     let draw_area = DrawingArea::builder()
-        .height_request(150)
+        .height_request(250)
+        .expand(true)
+        .margin(3)
         .build()
     ;
 
-    let text_buffer = text_field.buffer().unwrap();
-    text_buffer.set_text(informula.borrow().as_str());
-    text_buffer.select_range(&text_buffer.start_iter(), &text_buffer.end_iter());
+    let status_bar = Statusbar::builder()
+        .build()
+    ;
+    text_field.select_region(0, text_field.selection_bound());
     text_field.grab_focus();
-
-    let last_ok_string = Rc::new(RefCell::new(EXAMPLE_FORMULA.to_string()));
-
-    draw_area.connect_draw(clone!(@strong font, @strong text_buffer, @strong last_ok_string => move |area, context| {
-        context.set_source_rgb(0.0, 0.0, 0.0);
-
-        if let Some(text) = text_buffer.text(&text_buffer.start_iter(), &text_buffer.end_iter(), false) {
-            let width  = area.allocated_width()  as f64;
-            let height = area.allocated_height() as f64; 
-            dbg!(
-                &text,
-                area.allocated_width()  as f64,
-                area.allocated_height() as f64,
-            );
-
-            let result = draw_formula(text.as_str(), context, font.clone(), UI_FONT_SIZE, Some((width, height)));
-            if result.is_ok() {
-                let mut str_ref = last_ok_string.borrow_mut();
-                str_ref.clear();
-                str_ref.push_str(text.as_str());
-            }
-            else {
-                eprintln!("error!");
-                draw_formula(last_ok_string.borrow().as_str(), context, font.clone(), UI_FONT_SIZE, Some((width, height))).unwrap_or(());
-            }
-        }
-        Inhibit(false)
-    }));
+    text_field.set_text(informula.borrow().as_str());
+    // let text_buffer = text_field.buffer();
 
 
-
-    text_buffer.connect_changed(clone!(@weak draw_area => move |_text_buffer| {
-        draw_area.queue_draw()
-    }));
-
-
-    let button = Button::with_label("Save to SVG");
-    button.connect_clicked(clone!(@strong text_buffer, @strong font, => move |_| {
-        if let Some(text) = text_buffer.text(&text_buffer.start_iter(), &text_buffer.end_iter(), false) {
-            let result = save_svg(&Output::Path(PathBuf::from(SVG_PATH)), text.as_str(), font.clone(), font_size);
-        }
+    let save_svg_action = SimpleAction::new("save-svg", None);
+    // let button = Button::with_label("Save to SVG");
+    save_svg_action.connect_activate(clone!(@strong text_field, @strong font, => move |_, _| {
+        let text = text_field.text();
+        let result = save_svg(&Output::Path(PathBuf::from(SVG_PATH)), text.as_str(), font.clone(), font_size);
     }));
 
     let vbox = gtk::Box::builder()
         .orientation(gtk::Orientation::Vertical)
-        .spacing(3)
-        .margin(10)
+        .spacing(0)
+        .margin(0)
         .build()
     ;
 
     let scrolled_window = gtk::ScrolledWindow::builder()
+        .valign(gtk::Align::Start)
         .build()
     ;
     scrolled_window.add(&text_field);
     // \oint_C \vec{E} \cdot \mathrm{d} \vec \ell= - \frac{\mathrm{d}}{\mathrm{d}t} \left( \int_S \vec{B}\cdot\mathrm{d} \vec{S} \right)
 
-    vbox.add(&draw_area);
+    status_bar.push(0, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+
+
     vbox.add(&scrolled_window);
-    vbox.add(&button);
+    vbox.add(&draw_area);
+    vbox.pack_start(&status_bar, false, true, 0);
     window.add(&vbox);
 
-    // window.connect_delete_event(move |_, _| {
-    //     Inhibit(false)
-    // });
-    window.connect_delete_event(clone!(@strong text_buffer, @strong outfile, @strong font, => move |_, _| {
-        save_to_output(&text_buffer, outfile.borrow().deref(), format, font.clone(), font_size, metainfo).unwrap();
+    let last_ok_string = Rc::new(RefCell::new(EXAMPLE_FORMULA.to_string()));
+
+    draw_area.connect_draw(clone!(@strong font, @strong text_field, @strong last_ok_string, @strong status_bar => move |area, context| {
+        let text = text_field.text();
+        context.set_source_rgb(0.0, 0.0, 0.0);
+
+        let width  = area.allocated_width()  as f64;
+        let height = area.allocated_height() as f64; 
+
+        let result = draw_formula(text.as_str(), context, font.clone(), UI_FONT_SIZE, Some((width, height)));
+        match result {
+            Ok(_)  => {
+                status_bar.pop(0);
+                status_bar.hide();
+                let mut str_ref = last_ok_string.borrow_mut();
+                str_ref.clear();
+                str_ref.push_str(text.as_str());
+            },
+            Err(error) => {
+                status_bar.pop(0);
+                status_bar.show();
+                let error_string = error.human_readable();
+                eprintln!("{}", error_string);
+                status_bar.push(0, &error_string);
+                draw_formula(last_ok_string.borrow().as_str(), context, font.clone(), UI_FONT_SIZE, Some((width, height))).unwrap_or(());
+            },
+        }
+        Inhibit(false)
+    }));
+
+
+    text_field.connect_changed(clone!(@weak draw_area => move |_text_buffer| {
+        draw_area.queue_draw()
+    }));
+
+
+    window.connect_delete_event(clone!(@strong text_field, @strong outfile, @strong font, => move |_, _| {
+        let text = text_field.text();
+        save_to_output(&text, outfile.borrow().deref(), format, font.clone(), font_size, metainfo).unwrap();
         Inhibit(false)
     }));
 
@@ -384,8 +416,7 @@ fn build_ui(app : &Application, font : TtfMathFont<'static>, app_context : AppCo
     
 }
 
-fn save_to_output(text_buffer: &gtk::TextBuffer, outfile: &Output, format : Format, font : Rc<TtfMathFont>, font_size : f64, print_metainfo : bool) -> AppResult<()> {
-    let text = text_buffer.text(&text_buffer.start_iter(), &text_buffer.end_iter(), false).ok_or(AppError::CouldNotGetTextBuffer)?;
+fn save_to_output(text: &str, outfile: &Output, format : Format, font : Rc<TtfMathFont>, font_size : f64, print_metainfo : bool) -> AppResult<()> {
     eprintln!("Saving to {:?}", outfile);
 
     match format {
@@ -435,7 +466,7 @@ fn save_svg(path : &Output, formula : &str, font : Rc<TtfMathFont>, font_size : 
 
 fn draw_formula<'a>(formula : &str, context: &Context, font : Rc<TtfMathFont<'a>>, font_size : f64, canvas_size : Option<(f64, f64)>,) -> AppResult<()> {
     let (layout, renderer, formula_metrics) = layout_and_size(font.as_ref(), font_size, formula,)?;
-    render_layout(context, canvas_size, &dbg!(formula_metrics), renderer, layout)
+    render_layout(context, canvas_size, &formula_metrics, renderer, layout)
 }
 
 fn render_layout(
@@ -452,7 +483,7 @@ fn render_layout(
         scale_and_center(*bbox, context, canvas_size);
     }
 
-    let mut backend = CairoBackend(context.clone());
+    let mut backend = rex::render::cairo::CairoBackend::new(context.clone());
     renderer.render(&layout, &mut backend);
 
 
@@ -497,7 +528,7 @@ struct MetaInfo {
 
 
 fn layout_and_size<'a, 'f>(font: &'f TtfMathFont<'a>, font_size : f64, formula: &str) -> Result<(rex::layout::Layout<'f, TtfMathFont<'a>>, Renderer, Metrics), AppError> {
-    let parse_node = parse(formula).map_err(|_| AppError::ParseError)?;
+    let parse_node = parse(formula).map_err(|e| AppError::ParseError(format!("{}", e)))?;
 
     // Create node
     let font_context = FontContext::new(font)?;
@@ -540,12 +571,13 @@ fn scale_and_center(bbox: BBox, context: &Context, canvas_size: (f64, f64)) {
 
     let tx = - (midx - 0.5 *  canvas_width / scale);
     let ty = - (midy - 0.5 *  canvas_height / scale);
+    // draw_bbox(context, 0., 0., canvas_width, canvas_height, 10., 10.);
     context.scale(scale, scale);
     context.translate(tx, ty);
 
-    // draw_bbox(context, x0, y0, width, height, x1, y1);
 }
 
+#[allow(unused)]
 fn draw_bbox(context: &Context, x0: f64, y0: f64, width: f64, height: f64, x1: f64, y1: f64) {
     context.set_source_rgb(1., 0., 0.);
     context.rectangle(x0, y0, width, height);
@@ -566,97 +598,3 @@ fn load_font<'a>(file : &'a [u8]) -> TtfMathFont<'a> {
     TtfMathFont::new(font).unwrap()
 }
 
-
-pub struct CairoBackend(Context);
-
-impl CairoBackend {
-    pub fn new(context: &Context) -> Self {
-        context.set_source_rgb(1., 0., 0.);
-        Self(context.clone())
-    }
-}
-
-impl<'a> Backend<TtfMathFont<'a>> for CairoBackend {}
-
-
-impl GraphicsBackend for CairoBackend {
-    fn rule(&mut self, pos: rex::Cursor, width: f64, height: f64) {
-        let context = &mut self.0;
-        context.rectangle(pos.x, pos.y, width, height);
-        context.fill().unwrap();
-    }
-
-
-    // We preliminary don't support color changes
-    fn begin_color(&mut self, color: rex::RGBA) {
-        unimplemented!()
-    }
-
-    fn end_color(&mut self) {
-        unimplemented!()
-    }
-}
-
-
-impl<'a> FontBackend<TtfMathFont<'a>> for CairoBackend {
-    fn symbol(&mut self, pos: rex::Cursor, gid: rex::font::common::GlyphId, scale: f64, ctx: &TtfMathFont<'a>) {
-        use ttf_parser::OutlineBuilder;
-
-        let context = &mut self.0;
-
-        context.save().unwrap();
-        context.translate(pos.x, pos.y);
-        context.scale(scale, -scale);
-        context.scale(ctx.font_matrix().sx.into(), ctx.font_matrix().sy.into(),);
-        context.set_fill_rule(gtk::cairo::FillRule::EvenOdd);
-        context.new_path();
-
-        struct Builder<'a> { 
-            // path   : Path,
-            // paint  : Paint,
-            context : &'a mut Context,
-        }
-
-        impl<'a> Builder<'a> {
-            fn fill(self) {
-                self.context.fill().unwrap();
-            }
-        }
-
-        impl<'a> OutlineBuilder for Builder<'a> {
-            fn move_to(&mut self, x: f32, y: f32) {
-                // eprintln!("move_to {:?} {:?}", x, y);
-                self.context.move_to(x.into(), y.into());
-            }
-
-            fn line_to(&mut self, x: f32, y: f32) {
-                // eprintln!("line_to {:?} {:?}", x, y);
-                self.context.line_to(x.into(), y.into());
-            }
-
-            fn quad_to(&mut self, x1: f32, y1: f32, x: f32, y: f32) {
-                // eprintln!("quad_to  {:?} {:?} {:?} {:?}", x1, y1, x, y);
-                self.context.curve_to(x1.into(), y1.into(), x1.into(), y1.into(), x.into(), y.into(),)
-            }
-
-            fn curve_to(&mut self, x1: f32, y1: f32, x2: f32, y2: f32, x: f32, y: f32) {
-                // eprintln!("curve_to {:?} {:?} {:?} {:?} {:?} {:?}", x1, y1, x2, y2, x, y);
-                self.context.curve_to(x1.into(), y1.into(), x2.into(), y2.into(), x.into(), y.into(),)
-            }
-
-            fn close(&mut self) {
-                // eprintln!("close");
-                self.context.close_path();
-            }
-
-        }
-
-        let mut builder = Builder {
-            context: context,
-        };
-
-        ctx.font().outline_glyph(gid.into(), &mut builder);
-        builder.fill();
-        context.restore().unwrap();
-    }
-}
