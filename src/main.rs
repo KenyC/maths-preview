@@ -1,3 +1,5 @@
+pub mod undo_stack;
+
 use std::cell::{RefCell, Cell};
 use std::io::Write;
 use std::ops::Deref;
@@ -11,7 +13,7 @@ use cairo::glib::VariantDict;
 use gtk::cairo::Context;
 use gtk::gio::SimpleAction;
 use gtk::glib::clone;
-use gtk::{prelude::*, TextView, DrawingArea, glib, Button, Statusbar, Entry};
+use gtk::{prelude::*, DrawingArea, glib, Statusbar, Entry};
 use gtk::{Application, ApplicationWindow};
 
 use rex::error::{FontError, LayoutError};
@@ -20,6 +22,8 @@ use rex::Renderer;
 use rex::font::FontContext;
 use rex::font::backend::ttf_parser::TtfMathFont;
 use rex::parser::parse;
+
+use crate::undo_stack::{UndoStack, get_selection};
 
 // const EXAMPLE_FORMULA : &str = r"\iint \sqrt{1 + f^2(x,t,t)}\,\mathrm{d}x\mathrm{d}y\mathrm{d}t = \sum \xi(t)";
 const EXAMPLE_FORMULA : &str = r"\left.x^{x^{x^x_x}_{x^x_x}}_{x^{x^x_x}_{x^x_x}}\right\} \mathrm{wat?}";
@@ -64,7 +68,6 @@ impl Default for Output {
 
 #[derive(Debug,)]
 enum AppError {
-    CouldNotGetTextBuffer,
     ParseError(String),
     IOError(std::io::Error),
     CairoError(cairo::Error),
@@ -83,7 +86,6 @@ impl AppError {
         };
 
         let error_message = match self {
-            AppError::CouldNotGetTextBuffer => "could not get text buffer".to_string(),
             AppError::ParseError(e)  => format!("{}", e),
             AppError::IOError(e)     => format!("{}", e),
             AppError::CairoError(e)  => format!("{}", e),
@@ -339,6 +341,7 @@ fn build_ui(app : &Application, font : TtfMathFont<'static>, app_context : AppCo
     text_field.grab_focus();
     text_field.set_text(informula.borrow().as_str());
     // let text_buffer = text_field.buffer();
+    let undo_stack = Rc::new(RefCell::new(UndoStack::new()));
 
 
     let save_svg_action = SimpleAction::new("save-svg", None);
@@ -346,6 +349,23 @@ fn build_ui(app : &Application, font : TtfMathFont<'static>, app_context : AppCo
     save_svg_action.connect_activate(clone!(@strong text_field, @strong font, => move |_, _| {
         let text = text_field.text();
         let result = save_svg(&Output::Path(PathBuf::from(SVG_PATH)), text.as_str(), font.clone(), font_size);
+    }));
+
+    let undo_action = SimpleAction::new("undo", None);
+    let redo_action = SimpleAction::new("redo", None);
+
+    app.add_action(&undo_action);
+    app.add_action(&redo_action);
+    app.set_accels_for_action("app.undo", &["<Ctrl>Z"]);
+    app.set_accels_for_action("app.redo", &["<Ctrl><Shift>Z"]);
+
+
+    undo_action.connect_activate(clone!(@strong text_field, @strong undo_stack => move |_, _| {
+        undo_stack.borrow_mut().undo(text_field.clone());
+    }));
+
+    redo_action.connect_activate(clone!(@strong text_field, @strong undo_stack => move |_, _| {
+        undo_stack.borrow_mut().redo(text_field.clone());
     }));
 
     let vbox = gtk::Box::builder()
@@ -403,6 +423,15 @@ fn build_ui(app : &Application, font : TtfMathFont<'static>, app_context : AppCo
 
     text_field.connect_changed(clone!(@weak draw_area => move |_text_buffer| {
         draw_area.queue_draw()
+    }));
+    text_field.connect_insert_text(clone!(@strong undo_stack => move |entry, text, pt| {
+        let selection = get_selection(&entry);
+        undo_stack.borrow_mut().insert_text(text, *pt, selection);
+    }));
+    text_field.connect_delete_text(clone!(@strong undo_stack => move |entry, start_pos, end_pos| {
+        let deleted_text = entry.chars(start_pos, end_pos).unwrap();
+        let selection = get_selection(&entry);
+        undo_stack.borrow_mut().delete_text(deleted_text.as_str(), start_pos, end_pos, selection);
     }));
 
 
