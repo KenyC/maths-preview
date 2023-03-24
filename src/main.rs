@@ -596,7 +596,11 @@ fn scale_and_center(bbox: BBox, context: &Context, canvas_size: (f64, f64)) {
 
     let fit_to_width  = canvas_width / width;
     let fit_to_height = canvas_height / height;
-    let scale = f64::min(fit_to_width, fit_to_height);
+    let optimal_scale = f64::min(fit_to_width, fit_to_height);
+    // we don't want the scale to keep changing as we type
+    // we only zoom out when the formula gets out of bound and we scale conservatively.
+    const FACTOR_INCREMENT : f64 = 0.65;
+    let scale = FACTOR_INCREMENT.powf((optimal_scale).log(FACTOR_INCREMENT).ceil());
 
     let tx = - (midx - 0.5 *  canvas_width / scale);
     let ty = - (midy - 0.5 *  canvas_height / scale);
