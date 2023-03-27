@@ -60,6 +60,8 @@ def insert_formula(block):
 	initial_formula = None
 	if selection.getImplementationName() == "SwXTextGraphicObject": 
 		text_graphic_object = selection
+		# When the selection is a TextGraphicsObject, LO gives a default value to CharHeight
+		char_height = selection.Anchor.CharHeight
 		# TODO: have a way to distinguish formulas from other TextGraphicsShape
 		initial_formula = selection.Description
 
@@ -72,6 +74,8 @@ def insert_formula(block):
 	assert(metainfo is not None)
 	width_pt  = metainfo["metrics"]["bbox"]["x_max"] - metainfo["metrics"]["bbox"]["x_min"] 
 	height_pt = metainfo["metrics"]["bbox"]["y_max"] - metainfo["metrics"]["bbox"]["y_min"]
+	if width_pt == 0 or height_pt == 0:
+		return
 
 	#######################################
 	# INSERT GRAPHICS
