@@ -348,7 +348,9 @@ fn build_ui(app : &Application, font : TtfMathFont<'static>, app_context : AppCo
     // let button = Button::with_label("Save to SVG");
     save_svg_action.connect_activate(clone!(@strong text_field, @strong font, => move |_, _| {
         let text = text_field.text();
+        // TODO : error handling
         let result = save_svg(&Output::Path(PathBuf::from(SVG_PATH)), text.as_str(), font.clone(), font_size);
+        result.unwrap();
     }));
 
     let undo_action = SimpleAction::new("undo", None);

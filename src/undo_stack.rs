@@ -1,5 +1,3 @@
-use std::ops::Range;
-
 use gtk::{EntryBuffer, Entry, traits::{EntryExt, EditableExt}};
 
 #[derive(Debug)]
@@ -66,8 +64,8 @@ pub struct UndoStack {
 
 impl UndoStack {
     pub fn new() -> Self { 
-        let mut past   = Vec::with_capacity(20);
-        let mut future = Vec::with_capacity(5);
+        let past   = Vec::with_capacity(20);
+        let future = Vec::with_capacity(5);
         Self { past, future, }
     }
 

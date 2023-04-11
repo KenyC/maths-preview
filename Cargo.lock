@@ -592,7 +592,7 @@ checksum = "f162c6dd7b008981e4d40210aca20b4bd0f9b60ca9271061b07f78537722f2e1"
 [[package]]
 name = "rex"
 version = "0.1.2"
-source = "git+https://github.com/KenyC/ReX#c45d3f51bd2e33017b51ebf202309a424a7eaf7c"
+source = "git+https://github.com/KenyC/ReX#df7fefa03023dfd2087070773010b5d82338de65"
 dependencies = [
  "cairo-rs",
  "log",
@@ -765,7 +765,7 @@ checksum = "e5464a87b239f13a63a501f2701565754bae92d243d4bb7eb12f6d57d2269bf4"
 [[package]]
 name = "unicode-math"
 version = "0.1.0"
-source = "git+https://github.com/KenyC/ReX#c45d3f51bd2e33017b51ebf202309a424a7eaf7c"
+source = "git+https://github.com/KenyC/ReX#df7fefa03023dfd2087070773010b5d82338de65"
 dependencies = [
  "regex",
 ]
