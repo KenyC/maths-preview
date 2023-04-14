@@ -1,2 +1,7 @@
 /target
+/maths-preview-web/target
+**/*.rs.bk
+maths-preview-web/bin/
+maths-preview-web/www/
+wasm-pack.log
 clients/libreoffice-write/InsertFromMathsPreview.oxt
