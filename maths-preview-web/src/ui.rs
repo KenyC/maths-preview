@@ -1,4 +1,3 @@
-use base64::Engine;
 use wasm_bindgen::JsCast;
 use web_sys::{Element, Document, HtmlAnchorElement, Blob, Url};
 

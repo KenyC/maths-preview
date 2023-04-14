@@ -1,12 +1,13 @@
+#[macro_use]
 mod utils;
 mod error;
 mod canvas;
 mod ui;
 
 use canvas::CanvasContext;
-use rex::{font::{backend::ttf_parser::TtfMathFont, common::GlyphId, FontContext}, GraphicsBackend, FontBackend, Backend, parser::parse, layout::Grid, Renderer};
+use rex::{font::{backend::ttf_parser::TtfMathFont, FontContext}, parser::parse, layout::Grid, Renderer};
 use ui::{ErrorBar, initiate_download_file};
-use web_sys::{CanvasRenderingContext2d, CanvasWindingRule, HtmlCanvasElement, HtmlElement, Blob,};
+use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement, HtmlElement, Blob,};
 use utils::set_panic_hook;
 use wasm_bindgen::prelude::*;
 use error::{AppError, AppResult};
@@ -29,7 +30,6 @@ extern "C" {
 
 const FONT_FILE : &[u8] = include_bytes!("../resources/LibertinusMath-Regular.otf");
 // const FONT_FILE : &[u8] = include_bytes!("../resources/LibertinusMath-Regular.woff2");
-const TEXT_TO_RENDER : &str = "fez";
 
 // Called when the wasm module is instantiated
 #[wasm_bindgen(start)]
@@ -62,11 +62,8 @@ pub fn main() -> Result<(), JsValue> {
         .dyn_into::<web_sys::HtmlCanvasElement>().unwrap()
         ;
     let context = canvas
-        .get_context("2d")
-        .unwrap()
-        .unwrap()
-        .dyn_into::<web_sys::CanvasRenderingContext2d>()
-        .unwrap();
+        .get_context("2d").unwrap().unwrap()
+        .dyn_into::<web_sys::CanvasRenderingContext2d>().unwrap();
     let text_edit =
         document
         .get_element_by_id("formula").unwrap()
@@ -89,10 +86,12 @@ pub fn main() -> Result<(), JsValue> {
 
 
     // -- Resize handler
-    let canvas_clone = canvas.clone();
-    let resize_handler = Closure::wrap(Box::new(move || {
-        resize_canvas_to_body_size(&body, &canvas);
-    }) as Box<dyn Fn()>
+    let resize_handler = Closure::wrap(Box::new(clone!(
+        canvas 
+        => move || {
+            resize_canvas_to_body_size(&body, &canvas);
+        }
+    )) as Box<dyn Fn()>
     );
     window.set_onresize(Some(resize_handler.as_ref().unchecked_ref()));
     resize_handler.forget();
@@ -106,21 +105,21 @@ pub fn main() -> Result<(), JsValue> {
 
 
     // -- Text edit handler
-    let text_edit_clone = text_edit.clone();
-    let context_clone   = context.clone();
-    let math_font_clone = math_font.clone();
-    let error_bar_clone = error_bar.clone();
-    let oninput_handler = Closure::wrap(Box::new(move || {
-        let text = text_edit_clone.value();
-        if let Err(err) = update_canvas(&text, CanvasContext(&context), &math_font) {
-            let human_readable_err = err.human_readable();
-            log(&human_readable_err);
-            error_bar_clone.set_text(&human_readable_err);
-        }
-        else {
-            error_bar_clone.hide();
-        }
-    }) as Box<dyn Fn()>);
+    let oninput_handler = Closure::wrap(Box::new(
+        clone!(
+        context, text_edit, math_font, error_bar 
+        => move || {
+            let text = text_edit.value();
+            if let Err(err) = update_canvas(&text, CanvasContext(&context), &math_font) {
+                let human_readable_err = err.human_readable();
+                log(&human_readable_err);
+                error_bar.set_text(&human_readable_err);
+            }
+            else {
+                error_bar.hide();
+            }
+        })
+    ) as Box<dyn Fn()>);
     text_edit.set_oninput(Some(oninput_handler.as_ref().unchecked_ref()));
     oninput_handler.forget();
 
@@ -133,14 +132,49 @@ pub fn main() -> Result<(), JsValue> {
         .get_element_by_id("render").unwrap()
         .dyn_into::<web_sys::HtmlButtonElement>().ok().unwrap()
     ;
-    let etzt = Closure::wrap(Box::new(move |blob| {
-        initiate_download_file(&document, &blob, None).unwrap();
-    }) as Box<dyn Fn(Blob)>);
+    let start_download = Closure::wrap(Box::new(
+        clone!(document => move |blob| {
+            initiate_download_file(&document, &blob, None).unwrap();
+        })
+    ) as Box<dyn Fn(Blob)>);
     let onclick_handler = Closure::wrap(
-        Box::new(move || {
-            canvas_clone.to_blob(etzt.as_ref().unchecked_ref());
-            log("Initiating file download");
-        }) as Box<dyn Fn()>
+        Box::new(clone!(
+            document, error_bar, text_edit, math_font
+            =>
+            move || {
+                error_bar.set_text("Preparing image...");
+                let text = text_edit.value();
+
+                const FONT_SIZE_EXPORT : f64 = 50.;
+                let (layout, _a, formula_metrics) = layout_and_size(&math_font, FONT_SIZE_EXPORT, &text).unwrap();
+
+                let bbox   = formula_metrics.bbox;
+                let width  = bbox.width();
+                let height = bbox.height();
+                const DPI : f64 = 96.;
+                const INCH_PER_POINT : f64  = 1. / 72.;
+                const PIXELS_PER_POINT : f64 = DPI * INCH_PER_POINT;
+                log(&format!("{} x {}", width, height,));
+                let offscreen_canvas = 
+                    document
+                    .create_element("canvas").unwrap()
+                    .dyn_into::<HtmlCanvasElement>().unwrap()
+                ;
+                offscreen_canvas.set_width ((width  * PIXELS_PER_POINT) as u32);        
+                offscreen_canvas.set_height((height * PIXELS_PER_POINT) as u32);        
+                let context = offscreen_canvas
+                    .get_context("2d").unwrap().unwrap()
+                    .dyn_into::<CanvasRenderingContext2d>().unwrap();
+
+
+                let renderer = Renderer::new();
+                render_layout(&mut CanvasContext(&context), None, &formula_metrics, renderer, layout).unwrap();
+
+                offscreen_canvas.to_blob(start_download.as_ref().unchecked_ref()).unwrap();
+
+                error_bar.hide();
+            }
+        )) as Box<dyn Fn()>
     );
     button.set_onclick(Some(onclick_handler.as_ref().unchecked_ref()));
     onclick_handler.forget();
@@ -167,10 +201,10 @@ fn update_canvas<'a>(formula : &str, context : CanvasContext, math_font : &TtfMa
 
 fn render_formula<'a>(formula : &str, mut context : CanvasContext, math_font : &TtfMathFont<'a>) -> AppResult<()> {
     let (layout, _a, formula_metrics) = layout_and_size(&math_font, 10., formula)?;
-    let renderer = Renderer::new();
 
     let canvas_size = get_canvas_size(context);
     context.0.clear_rect(0., 0., canvas_size.0, canvas_size.1);
+    let renderer = Renderer::new();
     render_layout(&mut context, Some(canvas_size), &formula_metrics, renderer, layout)?;
 
     Ok(())
@@ -247,8 +281,8 @@ fn render_layout(
 ) -> Result<(), AppError> {
     // let (x0, y0, x1, y1) = renderer.size(&node);
     context.0.save();
-    let Metrics { bbox, .. } = formula_metrics;
     if let Some(canvas_size) = canvas_size {
+        let Metrics { bbox, .. } = formula_metrics;
         scale_and_center(*bbox, context, canvas_size);
     }
 

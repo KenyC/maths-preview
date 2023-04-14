@@ -57,6 +57,11 @@
       #formula {
         width: 100%;
       }
+      #toolbar {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
       #canvas {
         border: solid 1pt black;
       }
@@ -69,6 +74,8 @@
     <input type="text" id="formula">
     <canvas id="canvas"></canvas>
     <div id="error"></div>
-    <button type="button" id="render">Render</button>
+    <div id="toolbar">
+      <button type="button" id="render">Save as PNG...</button>
+    </div>
   </body>
 </html>
