@@ -6,6 +6,7 @@ use std::ops::Deref;
 use std::path::PathBuf;
 use std::rc::Rc;
 
+use rex::layout::engine::layout;
 use serde::Serialize;
 use serde_json;
 
@@ -17,7 +18,6 @@ use gtk::{prelude::*, DrawingArea, glib, Statusbar, Entry};
 use gtk::{Application, ApplicationWindow};
 
 use rex::error::{FontError, LayoutError};
-use rex::layout::Grid;
 use rex::Renderer;
 use rex::font::FontContext;
 use rex::font::backend::ttf_parser::TtfMathFont;
@@ -534,6 +534,16 @@ struct BBox {
 impl BBox {
     fn new(x_min: f64, y_min: f64, x_max: f64, y_max: f64) -> Self { Self { x_min, y_min, x_max, y_max } }
 
+    /// This assumes the baseline is at y = 0
+    fn from_typographic(x_min: f64, depth: f64, x_max: f64, height: f64) -> Self { 
+        // height is signed distance from baseline to top of the glyph's bounding box
+        // height > 0 means that top of bouding box is above baseline (i.e. y_min)
+        // above in the screen's coordinate system means Y < 0
+        // So y_min = - height
+        // Similar reasoning for depth
+        Self { x_min, y_min : -height, x_max, y_max : -depth } 
+    }
+
     #[inline]
     fn width(&self) -> f64 { self.x_max - self.x_min }
 
@@ -564,22 +574,15 @@ fn layout_and_size<'a, 'f>(font: &'f TtfMathFont<'a>, font_size : f64, formula: 
     // Create node
     let font_context = FontContext::new(font)?;
     let layout_settings = rex::layout::LayoutSettings::new(&font_context, font_size, rex::layout::Style::Display);
-    let node = rex::layout::engine::layout(&parse_node, layout_settings)?;
-    let depth = node.depth;
+    let layout = layout(&parse_node, layout_settings)?;
 
-    // Lay out node
-    let mut grid = Grid::new();
-    grid.insert(0, 0, node.as_node());
-    let mut layout = rex::layout::Layout::new();
-    layout.add_node(grid.build());
-
-    // Size
     let renderer = Renderer::new();
     let formula_bbox = renderer.size(&layout);
+    let depth = layout.depth;
 
     // Create metrics
     let metrics = Metrics {
-        bbox: BBox::new(formula_bbox.0, formula_bbox.1, formula_bbox.2, formula_bbox.3,),
+        bbox: BBox::from_typographic(formula_bbox.0, formula_bbox.1, formula_bbox.2, formula_bbox.3,),
         baseline: depth / rex::dimensions::Px,
         font_size,
     };
