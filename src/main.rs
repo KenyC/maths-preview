@@ -1,4 +1,7 @@
 pub mod undo_stack;
+pub mod error;
+pub mod geometry;
+mod render;
 
 use std::cell::{RefCell, Cell};
 use std::io::Write;
@@ -6,8 +9,6 @@ use std::ops::Deref;
 use std::path::PathBuf;
 use std::rc::Rc;
 
-use rex::layout::engine::layout;
-use serde::Serialize;
 use serde_json;
 
 use cairo::glib::VariantDict;
@@ -17,13 +18,13 @@ use gtk::glib::clone;
 use gtk::{prelude::*, DrawingArea, glib, Statusbar, Entry};
 use gtk::{Application, ApplicationWindow};
 
-use rex::error::{FontError, LayoutError};
-use rex::Renderer;
-use rex::font::FontContext;
 use rex::font::backend::ttf_parser::TtfMathFont;
-use rex::parser::parse;
 
-use crate::undo_stack::{UndoStack, get_selection};
+use error::AppResult;
+use undo_stack::{UndoStack, get_selection};
+use render::{render_layout, layout_and_size, draw_formula, MetaInfo};
+use geometry::Metrics;
+
 
 // const EXAMPLE_FORMULA : &str = r"\iint \sqrt{1 + f^2(x,t,t)}\,\mathrm{d}x\mathrm{d}y\mathrm{d}t = \sum \xi(t)";
 const EXAMPLE_FORMULA : &str = r"\left.x^{x^{x^x_x}_{x^x_x}}_{x^{x^x_x}_{x^x_x}}\right\} \mathrm{wat?}";
@@ -66,58 +67,7 @@ impl Default for Output {
 }
 
 
-#[derive(Debug,)]
-enum AppError {
-    ParseError(String),
-    IOError(std::io::Error),
-    CairoError(cairo::Error),
-    FontError(FontError),
-    LayoutError(LayoutError),
-}
 
-impl AppError {
-    fn human_readable(&self) -> String {
-        let error_tag = match self {
-            AppError::FontError(_) |
-            AppError::LayoutError(LayoutError::Font(_)) => "Font Error",
-            AppError::ParseError(_) => "Parse Error",
-
-            _ => "App-internal Error",
-        };
-
-        let error_message = match self {
-            AppError::ParseError(e)  => format!("{}", e),
-            AppError::IOError(e)     => format!("{}", e),
-            AppError::CairoError(e)  => format!("{}", e),
-            AppError::FontError(e)   |
-            AppError::LayoutError(LayoutError::Font(e)) => format!("{}", e),
-        };
-
-        format!("{} : {}", error_tag, error_message)
-    }
-}
-
-type AppResult<A> = Result<A, AppError>;
-
-impl From<std::io::Error> for AppError {
-    fn from(err: std::io::Error) -> Self 
-    { Self::IOError(err) }
-}
-
-impl From<cairo::Error> for AppError {
-    fn from(err: cairo::Error) -> Self 
-    { Self::CairoError(err) }
-}
-
-impl From<FontError> for AppError {
-    fn from(err: FontError) -> Self 
-    { Self::FontError(err) }
-}
-
-impl From<LayoutError> for AppError {
-    fn from(err: LayoutError) -> Self 
-    { Self::LayoutError(err) }
-}
 
 #[derive(Clone)]
 struct AppContext {
@@ -384,7 +334,7 @@ fn build_ui(app : &Application, font : TtfMathFont<'static>, app_context : AppCo
     scrolled_window.add(&text_field);
     // \oint_C \vec{E} \cdot \mathrm{d} \vec \ell= - \frac{\mathrm{d}}{\mathrm{d}t} \left( \int_S \vec{B}\cdot\mathrm{d} \vec{S} \right)
 
-    status_bar.push(0, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+    status_bar.push(0, "Loading ...");
 
 
     vbox.add(&scrolled_window);
@@ -495,141 +445,6 @@ fn save_svg(path : &Output, formula : &str, font : Rc<TtfMathFont>, font_size : 
 }
 
 
-fn draw_formula<'a>(formula : &str, context: &Context, font : Rc<TtfMathFont<'a>>, font_size : f64, canvas_size : Option<(f64, f64)>,) -> AppResult<()> {
-    let (layout, renderer, formula_metrics) = layout_and_size(font.as_ref(), font_size, formula,)?;
-    render_layout(context, canvas_size, &formula_metrics, renderer, layout)
-}
-
-fn render_layout(
-    context: &Context, 
-    canvas_size: Option<(f64, f64)>, 
-    formula_metrics: &Metrics, 
-    renderer: Renderer, 
-    layout: rex::layout::Layout<TtfMathFont>,
-) -> Result<(), AppError> {
-    // let (x0, y0, x1, y1) = renderer.size(&node);
-    context.save()?;
-    let Metrics { bbox, .. } = formula_metrics;
-    if let Some(canvas_size) = canvas_size {
-        scale_and_center(*bbox, context, canvas_size);
-    }
-
-    let mut backend = rex::render::cairo::CairoBackend::new(context.clone());
-    renderer.render(&layout, &mut backend);
-
-
-
-    context.restore()?;
-    Ok(())
-}
-
-#[derive(Debug, Serialize, Clone, Copy)]
-struct BBox {
-    x_min  : f64,
-    y_min  : f64,
-    x_max  : f64,
-    y_max  : f64,
-}
-
-impl BBox {
-    fn new(x_min: f64, y_min: f64, x_max: f64, y_max: f64) -> Self { Self { x_min, y_min, x_max, y_max } }
-
-    /// This assumes the baseline is at y = 0
-    fn from_typographic(x_min: f64, depth: f64, x_max: f64, height: f64) -> Self { 
-        // height is signed distance from baseline to top of the glyph's bounding box
-        // height > 0 means that top of bouding box is above baseline (i.e. y_min)
-        // above in the screen's coordinate system means Y < 0
-        // So y_min = - height
-        // Similar reasoning for depth
-        Self { x_min, y_min : -height, x_max, y_max : -depth } 
-    }
-
-    #[inline]
-    fn width(&self) -> f64 { self.x_max - self.x_min }
-
-    #[inline]
-    fn height(&self) -> f64 { self.y_max - self.y_min }
-}
-
-
-#[derive(Debug, Serialize)]
-struct Metrics {
-    bbox      : BBox,
-    baseline  : f64,
-    font_size : f64,
-}
-
-
-
-#[derive(Debug, Serialize)]
-struct MetaInfo {
-    metrics : Metrics,
-    formula : String,
-}
-
-
-fn layout_and_size<'a, 'f>(font: &'f TtfMathFont<'a>, font_size : f64, formula: &str) -> Result<(rex::layout::Layout<'f, TtfMathFont<'a>>, Renderer, Metrics), AppError> {
-    let parse_node = parse(formula).map_err(|e| AppError::ParseError(format!("{}", e)))?;
-
-    // Create node
-    let font_context = FontContext::new(font)?;
-    let layout_settings = rex::layout::LayoutSettings::new(&font_context, font_size, rex::layout::Style::Display);
-    let layout = layout(&parse_node, layout_settings)?;
-
-    let renderer = Renderer::new();
-    let formula_bbox = renderer.size(&layout);
-    let depth = layout.depth;
-
-    // Create metrics
-    let metrics = Metrics {
-        bbox: BBox::from_typographic(formula_bbox.0, formula_bbox.1, formula_bbox.2, formula_bbox.3,),
-        baseline: depth / rex::dimensions::Px,
-        font_size,
-    };
-
-    Ok((layout, renderer, metrics))
-}
-
-fn scale_and_center(bbox: BBox, context: &Context, canvas_size: (f64, f64)) {
-    let width   = bbox.width();
-    let height  = bbox.height();
-    if width <= 0. || height < 0. {return;}
-    let (canvas_width, canvas_height) = canvas_size;
-    let BBox { x_min, y_min, x_max, y_max } = bbox;
-    let midx = 0.5 * (x_min + x_max);
-    let midy = 0.5 * (y_min + y_max);
-
-    let fit_to_width  = canvas_width / width;
-    let fit_to_height = canvas_height / height;
-    let optimal_scale = f64::min(fit_to_width, fit_to_height);
-    // we don't want the scale to keep changing as we type
-    // we only zoom out when the formula gets out of bound and we scale conservatively.
-    const FACTOR_INCREMENT : f64 = 0.65;
-    let scale = FACTOR_INCREMENT.powf((optimal_scale).log(FACTOR_INCREMENT).ceil());
-
-    let tx = - (midx - 0.5 *  canvas_width / scale);
-    let ty = - (midy - 0.5 *  canvas_height / scale);
-    // draw_bbox(context, 0., 0., canvas_width, canvas_height, 10., 10.);
-    context.scale(scale, scale);
-    context.translate(tx, ty);
-
-}
-
-#[allow(unused)]
-fn draw_bbox(context: &Context, x0: f64, y0: f64, width: f64, height: f64, x1: f64, y1: f64) {
-    context.set_source_rgb(1., 0., 0.);
-    context.rectangle(x0, y0, width, height);
-    context.stroke().unwrap();
-
-    context.set_source_rgb(0., 1., 0.);
-    const WIDTH_POINT : f64 = 5.;
-    context.rectangle(x0 - WIDTH_POINT * 0.5, y0 - WIDTH_POINT * 0.5, WIDTH_POINT, WIDTH_POINT);
-    context.fill().unwrap();
-
-    context.set_source_rgb(0., 1., 0.);
-    context.rectangle(x1 - WIDTH_POINT * 0.5, y1 - WIDTH_POINT * 0.5, WIDTH_POINT, WIDTH_POINT);
-    context.fill().unwrap();
-}
 
 fn load_font<'a>(file : &'a [u8]) -> TtfMathFont<'a> {
     let font = ttf_parser::Face::parse(file, 0).unwrap();
