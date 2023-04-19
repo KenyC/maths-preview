@@ -430,7 +430,7 @@ fn save_tex(outfile: &Output, text: &str) -> AppResult<()> {
 
 
 fn save_svg(path : &Output, formula : &str, font : Rc<TtfMathFont>, font_size : f64,) -> AppResult<Metrics> {
-    let (layout, renderer, formula_metrics) = layout_and_size(font.as_ref(), font_size, formula)?;
+    let (layout, formula_metrics) = layout_and_size(font.as_ref(), font_size, formula)?;
 
     eprintln!("Saving to SVG!");
     let formula_bbox = &formula_metrics.bbox;
@@ -439,7 +439,7 @@ fn save_svg(path : &Output, formula : &str, font : Rc<TtfMathFont>, font_size : 
     let svg_surface = gtk::cairo::SvgSurface::for_stream(width, height, path.stream()?)?;
     let context = Context::new(svg_surface)?;
 
-    render_layout(&context, None, &formula_metrics, renderer, layout)?;
+    render_layout(&context, None, &formula_metrics, layout)?;
     Ok(formula_metrics)
 
 }

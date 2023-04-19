@@ -9,15 +9,14 @@ use crate::{geometry::{Metrics, BBox}, error::{AppResult, AppError}};
 
 
 pub fn draw_formula<'a>(formula : &str, context: &Context, font : Rc<TtfMathFont<'a>>, font_size : f64, canvas_size : Option<(f64, f64)>,) -> AppResult<()> {
-    let (layout, renderer, formula_metrics) = layout_and_size(font.as_ref(), font_size, formula,)?;
-    render_layout(context, canvas_size, &formula_metrics, renderer, layout)
+    let (layout, formula_metrics) = layout_and_size(font.as_ref(), font_size, formula,)?;
+    render_layout(context, canvas_size, &formula_metrics, layout)
 }
 
 pub fn render_layout(
     context: &Context, 
     canvas_size: Option<(f64, f64)>, 
     formula_metrics: &Metrics, 
-    renderer: Renderer, 
     layout: rex::layout::Layout<TtfMathFont>,
 ) -> AppResult<()> {
     // let (x0, y0, x1, y1) = renderer.size(&node);
@@ -28,6 +27,7 @@ pub fn render_layout(
     }
 
     let mut backend = rex::render::cairo::CairoBackend::new(context.clone());
+    let renderer = Renderer::new();
     renderer.render(&layout, &mut backend);
 
 
@@ -45,7 +45,7 @@ pub struct MetaInfo {
 }
 
 
-pub fn layout_and_size<'a, 'f>(font: &'f TtfMathFont<'a>, font_size : f64, formula: &str) -> AppResult<(rex::layout::Layout<'f, TtfMathFont<'a>>, Renderer, Metrics)> {
+pub fn layout_and_size<'a, 'f>(font: &'f TtfMathFont<'a>, font_size : f64, formula: &str) -> AppResult<(rex::layout::Layout<'f, TtfMathFont<'a>>, Metrics)> {
     let parse_node = parse(formula).map_err(|e| AppError::ParseError(format!("{}", e)))?;
 
     // Create node
@@ -54,17 +54,16 @@ pub fn layout_and_size<'a, 'f>(font: &'f TtfMathFont<'a>, font_size : f64, formu
     let layout = layout(&parse_node, layout_settings)?;
 
     let renderer = Renderer::new();
-    let formula_bbox = renderer.size(&layout);
-    let depth = layout.depth;
+    let formula_bbox = layout.size();
 
     // Create metrics
     let metrics = Metrics {
-        bbox: BBox::from_typographic(formula_bbox.0, formula_bbox.1, formula_bbox.2, formula_bbox.3,),
-        baseline: depth / rex::dimensions::Px,
+        bbox: BBox::from_typographic(0., formula_bbox.depth, formula_bbox.width, formula_bbox.height,),
+        baseline: formula_bbox.depth,
         font_size,
     };
 
-    Ok((layout, renderer, metrics))
+    Ok((layout, metrics))
 }
 
 pub fn scale_and_center(bbox: BBox, context: &Context, canvas_size: (f64, f64)) {
