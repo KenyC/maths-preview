@@ -438,6 +438,9 @@ fn save_svg(path : &Output, formula : &str, font : Rc<TtfMathFont>, font_size : 
     let height = formula_bbox.height();
     let svg_surface = gtk::cairo::SvgSurface::for_stream(width, height, path.stream()?)?;
     let context = Context::new(svg_surface)?;
+    // In Cairo SVG, we aren't at a liberty to specify the view box, only height and width
+    // So we must translate so that the minimum y is 0
+    context.translate(0., - formula_bbox.y_min);
 
     render_layout(&context, None, &formula_metrics, layout)?;
     Ok(formula_metrics)
