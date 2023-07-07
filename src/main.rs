@@ -9,6 +9,7 @@ use std::ops::Deref;
 use std::path::PathBuf;
 use std::rc::Rc;
 
+use rex::parser::macros::CommandCollection;
 use serde_json;
 
 use cairo::glib::VariantDict;
@@ -71,23 +72,25 @@ impl Default for Output {
 
 #[derive(Clone)]
 struct AppContext {
-    math_font : Rc<Cell<& 'static [u8]>>,
-    format    : Rc<Cell<Format>>,
-    font_size : Rc<Cell<f64>>,
-    outfile   : Rc<RefCell<Output>>,
-    informula : Rc<RefCell<String>>,
-    metainfo  : Rc<Cell<bool>>,
+    math_font  : Rc<Cell<& 'static [u8]>>,
+    format     : Rc<Cell<Format>>,
+    font_size  : Rc<Cell<f64>>,
+    custom_cmd : Rc<RefCell<CommandCollection>>,
+    outfile    : Rc<RefCell<Output>>,
+    informula  : Rc<RefCell<String>>,
+    metainfo   : Rc<Cell<bool>>,
 }
 
 impl Default for AppContext {
     fn default() -> Self {
         Self {
-            math_font: Rc::new(Cell::new(DEFAULT_FONT)),
-            format:    Rc::new(Cell::default()),
-            font_size: Rc::new(Cell::new(UI_FONT_SIZE)),
-            outfile:   Rc::new(RefCell::default()),
-            informula: Rc::new(RefCell::new(EXAMPLE_FORMULA.to_string())),
-            metainfo:  Rc::new(Cell::new(false)),
+            math_font:  Rc::new(Cell::new(DEFAULT_FONT)),
+            format:     Rc::new(Cell::default()),
+            font_size:  Rc::new(Cell::new(UI_FONT_SIZE)),
+            outfile:    Rc::new(RefCell::default()),
+            informula:  Rc::new(RefCell::new(EXAMPLE_FORMULA.to_string())),
+            metainfo:   Rc::new(Cell::new(false)),
+            custom_cmd: Rc::default(),
         }
     }
 }
@@ -108,7 +111,7 @@ fn main() {
     application.connect_handle_local_options(clone!(
             @strong app_context, 
             => move |_application, option| {
-        let AppContext { math_font, format, font_size, outfile, informula, metainfo } = &app_context;
+        let AppContext { math_font, format, font_size, outfile, informula, metainfo, custom_cmd } = &app_context;
         if let Some(font_file) = parse_path(option) {
             math_font.set(font_file);
         }
@@ -121,6 +124,9 @@ fn main() {
         } 
         if let Some(formula) = parse_in_formula(option) {
             *informula.borrow_mut() = formula;
+        } 
+        if let Some(new_custom_cmd) = parse_styfile(option) {
+            *custom_cmd.borrow_mut() = new_custom_cmd;
         } 
         if parse_metainfo(option) {
             metainfo.set(true);
@@ -176,6 +182,15 @@ fn setup_command_line(application: &Application) {
         None,
     );
 
+    application.add_main_option(
+        "styfile", 
+        gtk::glib::Char(b'y' as i8), 
+        gtk::glib::OptionFlags::IN_MAIN, 
+        gtk::glib::OptionArg::Filename, 
+        "Reads a style file to provide custom command", 
+        None,
+    );
+
 
     application.add_main_option(
         "metainfo", 
@@ -209,6 +224,7 @@ fn parse_path(option : &VariantDict) -> Option<& 'static [u8]> {
     let mathfont = option.lookup_value("mathfont", None)?;
     let path : PathBuf = mathfont.try_get().ok()?;
 
+    // TODO: deal with failure to read file elegantly
     let font_bytes = std::fs::read(&path).unwrap();
     // TODO: find a more elegant way to deal with lifetimes.
     // The lifetime in TtfMathFont & the requirement that closures fed to GTK are 'static come in conflict.
@@ -236,6 +252,14 @@ fn parse_format(option : &VariantDict) -> Option<Format> {
 }
 
 
+fn parse_styfile(option : &VariantDict) -> Option<CommandCollection> {
+    let styfile = option.lookup_value("styfile", None)?;
+    let sty_filepath = styfile.try_get::<PathBuf>().ok()?;
+    let sty_file = std::fs::read_to_string(&sty_filepath).unwrap();
+    Some(CommandCollection::parse(&sty_file).unwrap())
+}
+
+
 fn parse_font_size(option : &VariantDict) -> Option<f64> {
     let outfile = option.lookup_value("fontsize", None)?;
     let result = outfile.try_get::<f64>().unwrap();
@@ -255,10 +279,10 @@ fn parse_metainfo(option : &VariantDict) -> bool {
 
 
 fn build_ui(app : &Application, font : TtfMathFont<'static>, app_context : AppContext) {
-    let AppContext { format, font_size, outfile, informula, metainfo, .. } = app_context;
-    let format    = format.get();
-    let metainfo  = metainfo.get();
-    let font_size = font_size.get();
+    let AppContext { format, font_size, outfile, informula, metainfo, custom_cmd, .. } = app_context;
+    let format     = format.get();
+    let metainfo   = metainfo.get();
+    let font_size  = font_size.get();
     dbg!(font_size);
     dbg!(format);
     let font = Rc::new(font);
@@ -296,10 +320,10 @@ fn build_ui(app : &Application, font : TtfMathFont<'static>, app_context : AppCo
 
     let save_svg_action = SimpleAction::new("save-svg", None);
     // let button = Button::with_label("Save to SVG");
-    save_svg_action.connect_activate(clone!(@strong text_field, @strong font, => move |_, _| {
+    save_svg_action.connect_activate(clone!(@strong text_field, @strong font, @strong custom_cmd => move |_, _| {
         let text = text_field.text();
         // TODO : error handling
-        let result = save_svg(&Output::Path(PathBuf::from(SVG_PATH)), text.as_str(), font.clone(), font_size);
+        let result = save_svg(&Output::Path(PathBuf::from(SVG_PATH)), text.as_str(), font.clone(), font_size, custom_cmd.borrow().deref());
         result.unwrap();
     }));
 
@@ -344,14 +368,14 @@ fn build_ui(app : &Application, font : TtfMathFont<'static>, app_context : AppCo
 
     let last_ok_string = Rc::new(RefCell::new(EXAMPLE_FORMULA.to_string()));
 
-    draw_area.connect_draw(clone!(@strong font, @strong text_field, @strong last_ok_string, @strong status_bar => move |area, context| {
+    draw_area.connect_draw(clone!(@strong font, @strong text_field, @strong last_ok_string, @strong status_bar, @strong custom_cmd => move |area, context| {
         let text = text_field.text();
         context.set_source_rgb(0.0, 0.0, 0.0);
 
         let width  = area.allocated_width()  as f64;
         let height = area.allocated_height() as f64; 
 
-        let result = draw_formula(text.as_str(), context, font.clone(), UI_FONT_SIZE, Some((width, height)));
+        let result = draw_formula(text.as_str(), context, font.clone(), UI_FONT_SIZE, Some((width, height)), custom_cmd.borrow().deref());
         match result {
             Ok(_)  => {
                 status_bar.pop(0);
@@ -366,7 +390,7 @@ fn build_ui(app : &Application, font : TtfMathFont<'static>, app_context : AppCo
                 let error_string = error.human_readable();
                 eprintln!("{}", error_string);
                 status_bar.push(0, &error_string);
-                draw_formula(last_ok_string.borrow().as_str(), context, font.clone(), UI_FONT_SIZE, Some((width, height))).unwrap_or(());
+                draw_formula(last_ok_string.borrow().as_str(), context, font.clone(), UI_FONT_SIZE, Some((width, height)), custom_cmd.borrow().deref()).unwrap_or(());
             },
         }
         Inhibit(false)
@@ -387,9 +411,9 @@ fn build_ui(app : &Application, font : TtfMathFont<'static>, app_context : AppCo
     }));
 
 
-    window.connect_delete_event(clone!(@strong text_field, @strong outfile, @strong font, => move |_, _| {
+    window.connect_delete_event(clone!(@strong text_field, @strong outfile, @strong font, @strong custom_cmd => move |_, _| {
         let text = text_field.text();
-        save_to_output(&text, outfile.borrow().deref(), format, font.clone(), font_size, metainfo).unwrap();
+        save_to_output(&text, outfile.borrow().deref(), format, font.clone(), font_size, metainfo, custom_cmd.borrow().deref()).unwrap();
         Inhibit(false)
     }));
 
@@ -397,12 +421,12 @@ fn build_ui(app : &Application, font : TtfMathFont<'static>, app_context : AppCo
     
 }
 
-fn save_to_output(text: &str, outfile: &Output, format : Format, font : Rc<TtfMathFont>, font_size : f64, print_metainfo : bool) -> AppResult<()> {
+fn save_to_output(text: &str, outfile: &Output, format : Format, font : Rc<TtfMathFont>, font_size : f64, print_metainfo : bool, custom_cmd : &CommandCollection) -> AppResult<()> {
     eprintln!("Saving to {:?}", outfile);
 
     match format {
         Format::Svg => {
-            let metrics = save_svg(outfile, &text, font, font_size)?;
+            let metrics = save_svg(outfile, &text, font, font_size, custom_cmd)?;
             if print_metainfo {
                 let metainfo = MetaInfo { metrics, formula: text.to_string() };
                 let json = serde_json::to_string(&metainfo);
@@ -429,8 +453,8 @@ fn save_tex(outfile: &Output, text: &str) -> AppResult<()> {
 }
 
 
-fn save_svg(path : &Output, formula : &str, font : Rc<TtfMathFont>, font_size : f64,) -> AppResult<Metrics> {
-    let (layout, formula_metrics) = layout_and_size(font.as_ref(), font_size, formula)?;
+fn save_svg(path : &Output, formula : &str, font : Rc<TtfMathFont>, font_size : f64, custom_cmd : &CommandCollection) -> AppResult<Metrics> {
+    let (layout, formula_metrics) = layout_and_size(font.as_ref(), font_size, formula, custom_cmd,)?;
 
     eprintln!("Saving to SVG!");
     let formula_bbox = &formula_metrics.bbox;

@@ -100,9 +100,10 @@ class OptionsDialogHandler(unohelper.Base, XContainerWindowEventHandler):
 		name = window.getModel().Name
 		if name != "InsertFromMathsPreview_AllOptions":
 			return
-		editor  = window.getControl("tf_MathsPreviewPath")
-		options = window.getControl("tf_MathsFont")
-		settings = {"names": ("MathsPreviewPath", "MathsFont"), "values": (editor.Text, options.Text)}
+		editor     = window.getControl("tf_MathsPreviewPath")
+		options    = window.getControl("tf_MathsFont")
+		custom_cmd = window.getControl("tf_CustomCommandFile")
+		settings = {"names": ("MathsPreviewPath", "MathsFont", "CustomCommandFile"), "values": (editor.Text, options.Text, custom_cmd.Text)}
 		self._configwriter(settings)
 
 	def _loadData(self, window, evName):
@@ -123,8 +124,10 @@ class OptionsDialogHandler(unohelper.Base, XContainerWindowEventHandler):
 		if settings:
 			tf_MathsPreviewPath = window.getControl("tf_MathsPreviewPath")
 			tf_MathsFont = window.getControl("tf_MathsFont")
+			tf_CustomCommandFile = window.getControl("tf_CustomCommandFile")
 			tf_MathsPreviewPath.setText(settings["MathsPreviewPath"])
 			tf_MathsFont.setText(settings["MathsFont"])
+			tf_CustomCommandFile.setText(settings["CustomCommandFile"])
 		return
 
 	def setup_buttons(self, window):
@@ -147,6 +150,17 @@ class OptionsDialogHandler(unohelper.Base, XContainerWindowEventHandler):
 			obj.chooseFile(ev, otf_filters, "tf_MathsFont") if str(ev.ActionCommand) == "ChooseEditor" else None
 		)
 		btn_PickExe = window.getControl("btn_PickFont")
+		btn_PickExe.ActionCommand = "ChooseEditor"
+		btn_PickExe.addActionListener(listener)
+
+		otf_filters = (
+			(RR.resolvestring('msg07'), '*.*'),
+			(RR.resolvestring('ek12'),  '*.sty;*.tex;*.ltx')
+		)
+		listener = ButtonListener(self, lambda obj, ev: 
+			obj.chooseFile(ev, otf_filters, "tf_CustomCommandFile") if str(ev.ActionCommand) == "ChooseEditor" else None
+		)
+		btn_PickExe = window.getControl("btn_PickCmdFile")
 		btn_PickExe.ActionCommand = "ChooseEditor"
 		btn_PickExe.addActionListener(listener)
 

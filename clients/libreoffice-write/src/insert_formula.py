@@ -70,7 +70,7 @@ def insert_formula(block):
 	# LAUNCH PROGRAM
 	#######################################
 	
-	metainfo = launch_maths_preview(settings["MathsPreviewPath"], char_height, path, maths_font = settings.get("MathsFont"), initial_formula = initial_formula)
+	metainfo = launch_maths_preview(settings["MathsPreviewPath"], char_height, path, maths_font = settings.get("MathsFont"), initial_formula = initial_formula, custom_cmd_file = settings.get("CustomCommandFile"))
 	assert(metainfo is not None)
 	width_pt  = metainfo["metrics"]["bbox"]["x_max"] - metainfo["metrics"]["bbox"]["x_min"] 
 	height_pt = metainfo["metrics"]["bbox"]["y_max"] - metainfo["metrics"]["bbox"]["y_min"]
@@ -105,10 +105,13 @@ def insert_formula(block):
 
 
 
-def launch_maths_preview(exe_path, char_height, path, maths_font = None, initial_formula = None):
+def launch_maths_preview(exe_path, char_height, path, maths_font = None, initial_formula = None, custom_cmd_file = None):
 	additional_args = []
 	if maths_font is not None:
 		additional_args.extend(["-m", maths_font,])
+
+	if custom_cmd_file is not None:
+		additional_args.extend(["-y", custom_cmd_file,])
 
 	if initial_formula is not None:
 		additional_args.extend(["-i", initial_formula,])
@@ -229,8 +232,9 @@ def get_apso_settings():
         settings.update({k: v for k, v in zip(props, values)})
 
     default_settings = {
-    	"MathsPreviewPath" : "~/bin/maths_preview",
-    	"MathsFont"        : None,
+    	"MathsPreviewPath"  : "~/bin/maths_preview",
+    	"MathsFont"         : None,
+    	"CustomCommandFile" : None,
     }
 
     for k, v in settings.items():

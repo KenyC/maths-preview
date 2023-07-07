@@ -17,7 +17,10 @@ class InsertFormulaCommand(sublime_plugin.TextCommand):
 		command.extend(["-i", text])
 
 		if "math_font" in settings:
-			command.extend(["-m", settings["math_font"]])
+			command.extend(["-m", os.path.expanduser(settings["math_font"])])
+
+		if "sty_file" in settings:
+			command.extend(["-y", os.path.expanduser(settings["sty_file"])])
 
 
 		sublime.set_timeout_async(lambda: self.get_formula(command), 0)

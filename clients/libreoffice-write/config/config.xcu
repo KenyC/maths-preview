@@ -8,5 +8,8 @@
         <prop oor:name="MathsFont" oor:type="xs:string">
             <value></value>
         </prop>
+        <prop oor:name="CustomCommandFile" oor:type="xs:string">
+            <value></value>
+        </prop>
     </node>
 </oor:component-data>
