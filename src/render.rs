@@ -1,7 +1,7 @@
 use std::rc::Rc;
 
 use cairo::Context;
-use rex::{Renderer, font::{backend::ttf_parser::TtfMathFont, FontContext}, parser::{parse, macros::CommandCollection, parse_with_custom_commands}, layout::engine::layout};
+use rex::{Renderer, font::{backend::ttf_parser::TtfMathFont, FontContext}, parser::{macros::CommandCollection, parse_with_custom_commands}, layout::engine::layout};
 use serde::Serialize;
 
 use crate::{geometry::{Metrics, BBox}, error::{AppResult, AppError}};

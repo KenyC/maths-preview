@@ -112,8 +112,16 @@ fn main() {
             @strong app_context, 
             => move |_application, option| {
         let AppContext { math_font, format, font_size, outfile, informula, metainfo, custom_cmd } = &app_context;
-        if let Some(font_file) = parse_path(option) {
-            math_font.set(font_file);
+        match parse_path(option) {
+            Ok(Some(font_file)) => math_font.set(font_file),
+            Err(e) => {
+                eprintln!("{}", e.human_readable());
+                // FIXME: for whatever reason, GTK ignores the exit status code here?
+                // We resort to something more brutal
+                // return 1;
+                std::process::exit(1);
+            },
+            Ok(None) => (),
         }
         *outfile.borrow_mut() = parse_outfile(option);
         if let Some(option_format) = parse_format(option) {
@@ -125,19 +133,30 @@ fn main() {
         if let Some(formula) = parse_in_formula(option) {
             *informula.borrow_mut() = formula;
         } 
-        if let Some(new_custom_cmd) = parse_styfile(option) {
-            *custom_cmd.borrow_mut() = new_custom_cmd;
-        } 
+        match parse_styfile(option) {
+            Ok(Some(new_custom_cmd)) => *custom_cmd.borrow_mut() = new_custom_cmd,
+            Err(e) => {
+                eprintln!("{}", e.human_readable());
+                // FIXME: for whatever reason, GTK ignores the exit status code here?
+                // We resort to something more brutal
+                // return 1;
+                std::process::exit(1);
+            },
+            Ok(None) => (),
+        }
         if parse_metainfo(option) {
             metainfo.set(true);
         } 
         -1
     }));
     application.connect_activate(clone!(@strong app_context => move |app| 
-        let font = {
-            load_font(app_context.math_font.get())
-        };
-        build_ui(app, font, app_context.clone())
+        match load_font(app_context.math_font.get()) {
+            Ok(font) => build_ui(app, font, app_context.clone()),
+            Err(e)   => {
+                eprintln!("{}", e.human_readable());
+                std::process::exit(1);
+            }
+        }
     ));
 
 
@@ -220,17 +239,20 @@ fn setup_command_line(application: &Application) {
     );
 }
 
-fn parse_path(option : &VariantDict) -> Option<& 'static [u8]> {
-    let mathfont = option.lookup_value("mathfont", None)?;
-    let path : PathBuf = mathfont.try_get().ok()?;
+fn parse_path(option : &VariantDict) -> AppResult<Option<& 'static [u8]>> {
+    if let Some(mathfont) = option.lookup_value("mathfont", None) {
+        if let Some(path) = mathfont.try_get::<PathBuf>().ok() {
+            let font_bytes = std::fs::read(&path)?;
+            // TODO: find a more elegant way to deal with lifetimes.
+            // The lifetime in TtfMathFont & the requirement that closures fed to GTK are 'static come in conflict.
+            // We leak the memory of the box so as to get a 'static reference.
+            // This is ok, because we only leak once, but it's somewhat inelegant.
+            Ok(Some(Box::leak(font_bytes.into_boxed_slice())))
+        }
+        else { Ok(None) }
+    }
+    else { Ok(None) }
 
-    // TODO: deal with failure to read file elegantly
-    let font_bytes = std::fs::read(&path).unwrap();
-    // TODO: find a more elegant way to deal with lifetimes.
-    // The lifetime in TtfMathFont & the requirement that closures fed to GTK are 'static come in conflict.
-    // We leak the memory of the box so as to get a 'static reference.
-    // This is ok, because we only leak once, but it's somewhat inelegant.
-    Some(Box::leak(font_bytes.into_boxed_slice()))
 }
 
 fn parse_outfile(option : &VariantDict) -> Output {
@@ -252,11 +274,15 @@ fn parse_format(option : &VariantDict) -> Option<Format> {
 }
 
 
-fn parse_styfile(option : &VariantDict) -> Option<CommandCollection> {
-    let styfile = option.lookup_value("styfile", None)?;
-    let sty_filepath = styfile.try_get::<PathBuf>().ok()?;
-    let sty_file = std::fs::read_to_string(&sty_filepath).unwrap();
-    Some(CommandCollection::parse(&sty_file).unwrap())
+fn parse_styfile(option : &VariantDict) -> AppResult<Option<CommandCollection>> {
+    if let Some(styfile) = option.lookup_value("styfile", None) {
+        if let Ok(sty_filepath) = styfile.try_get::<PathBuf>() {
+            let sty_file = std::fs::read_to_string(&sty_filepath)?;
+            Ok(Some(CommandCollection::parse(&sty_file)?))
+        }
+        else { Ok(None) }
+    }
+    else { Ok(None) }
 }
 
 
@@ -283,8 +309,6 @@ fn build_ui(app : &Application, font : TtfMathFont<'static>, app_context : AppCo
     let format     = format.get();
     let metainfo   = metainfo.get();
     let font_size  = font_size.get();
-    dbg!(font_size);
-    dbg!(format);
     let font = Rc::new(font);
 
     let window = ApplicationWindow::builder()
@@ -413,6 +437,8 @@ fn build_ui(app : &Application, font : TtfMathFont<'static>, app_context : AppCo
 
     window.connect_delete_event(clone!(@strong text_field, @strong outfile, @strong font, @strong custom_cmd => move |_, _| {
         let text = text_field.text();
+        // TODO: error handling
+        // Can't really see how to set an exit status code once the app is running
         save_to_output(&text, outfile.borrow().deref(), format, font.clone(), font_size, metainfo, custom_cmd.borrow().deref()).unwrap();
         Inhibit(false)
     }));
@@ -473,8 +499,8 @@ fn save_svg(path : &Output, formula : &str, font : Rc<TtfMathFont>, font_size : 
 
 
 
-fn load_font<'a>(file : &'a [u8]) -> TtfMathFont<'a> {
-    let font = ttf_parser::Face::parse(file, 0).unwrap();
-    TtfMathFont::new(font).unwrap()
+fn load_font<'a>(file : &'a [u8]) -> AppResult<TtfMathFont<'a>> {
+    let font = ttf_parser::Face::parse(file, 0)?;
+    Ok(TtfMathFont::new(font)?)
 }
 

@@ -71,7 +71,8 @@ def insert_formula(block):
 	#######################################
 	
 	metainfo = launch_maths_preview(settings["MathsPreviewPath"], char_height, path, maths_font = settings.get("MathsFont"), initial_formula = initial_formula, custom_cmd_file = settings.get("CustomCommandFile"))
-	assert(metainfo is not None)
+	if metainfo is None:
+		return
 	width_pt  = metainfo["metrics"]["bbox"]["x_max"] - metainfo["metrics"]["bbox"]["x_min"] 
 	height_pt = metainfo["metrics"]["bbox"]["y_max"] - metainfo["metrics"]["bbox"]["y_min"]
 	if width_pt == 0 or height_pt == 0:
@@ -136,7 +137,7 @@ def launch_maths_preview(exe_path, char_height, path, maths_font = None, initial
 	stderr = result.stderr.decode("utf-8") 
 	if result.returncode != 0:
 		msg_box(
-			"ERROR: maths_preview returned {}\\stdout: {}\\stderr: {}".format(
+			"ERROR: maths_preview returned {}\nstdout:\n {}\nstderr:\n {}".format(
 				result.returncode,
 				stdout, stderr,
 			)
