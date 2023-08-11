@@ -17,7 +17,12 @@ import json
 import tempfile
 import os
 import uuid
+import logging
 from utils import *
+
+# # For debug purposes
+logging.basicConfig(filename= os.path.join(tempfile.gettempdir(), "insert_formula_lo_write.log"), encoding='utf-8', level=logging.DEBUG)
+# logging.disable(logging.CRITICAL)
 
 FORMATS = [
 	"svg",
@@ -25,8 +30,11 @@ FORMATS = [
 ]
 
 
-
-
+# The width of the image reported by LO Write is the width of the SVG plus 27 hundredth of a mm
+# I don't know why this happens but it messes up size and alignement
+PADDING_HACK_CONSTANT_WIDTH  = 26.5 # 1/100mm
+PADDING_HACK_CONSTANT_HEIGHT = 26.5 # 1/100mm
+FORMULA_FILE = str(uuid.uuid4()) # always write to the same file to avoid building up large number of files in /tmp/
 
 def insert_block_formula(*args):
 	insert_formula(block = True)
@@ -39,7 +47,7 @@ def insert_inline_formula(*args):
 def insert_formula(block):
 	settings = get_apso_settings()
 	# create temporary file path
-	path = os.path.join(tempfile.gettempdir(), str(uuid.uuid4()))
+	path = os.path.join(tempfile.gettempdir(), FORMULA_FILE)
 
 	# Recover document
 	desktop = XSCRIPTCONTEXT.getDesktop()
@@ -119,13 +127,16 @@ def launch_maths_preview(exe_path, char_height, path, maths_font = None, initial
 
 	# Start program
 	try:
-		result = subprocess.run([
+		cmd = [
 			exe_path, 
 			"-s", str(char_height),
 			"-f", "svg", 
 			"-d", 
 			"-o", path
-		] +  additional_args, 
+		] +  additional_args
+		logging.debug(" ".join(cmd))
+		result = subprocess.run(
+			cmd, 
 			stdout = subprocess.PIPE, 
 			stderr = subprocess.PIPE,
 		)
@@ -171,8 +182,13 @@ def create_graphic_object_shape_from_path(doc, graphic_provider, path,):
 def fill_text_graphic_object_with_shape(text_graphic_object, graphic, width_pt, height_pt, description = None):
 	# desired unit is 1/100mm
 	# 1 DTP = 1 / 72 in = 0.3527778mm = 35.27778 1/100mm
-	one100th_mm_per_dot = 35.27778
+	one100th_mm_per_dot = 35.277777777
+	logging.debug("size pt: {} x {}".format(width_pt, height_pt))
 	size = Size(round(width_pt * one100th_mm_per_dot), round(height_pt * one100th_mm_per_dot))
+	logging.debug("size 1/100mm (pre-hack): {} x {}".format(size.Width, size.Height))
+	size.Width  += PADDING_HACK_CONSTANT_WIDTH 
+	size.Height += PADDING_HACK_CONSTANT_HEIGHT
+	logging.debug("size 1/100mm (post-hack): {} x {}".format(size.Width, size.Height))
 
 	text_graphic_object.Graphic = graphic
 	text_graphic_object.setSize(size)
@@ -191,7 +207,7 @@ def make_inline(text_graphic_object, baseline_percentage):
 	height = text_graphic_object.Size.Height
 	text_graphic_object.AnchorType = AS_CHARACTER
 	text_graphic_object.VertOrient = 0
-	text_graphic_object.VertOrientPosition = -  (1 + baseline_percentage) * height
+	text_graphic_object.VertOrientPosition = -  (1 + baseline_percentage) * height + PADDING_HACK_CONSTANT_HEIGHT / 2
 
 
 
