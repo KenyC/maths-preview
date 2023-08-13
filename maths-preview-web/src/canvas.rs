@@ -1,6 +1,8 @@
-use rex::{Backend, font::{backend::ttf_parser::TtfMathFont, common::GlyphId}, GraphicsBackend, FontBackend};
-use ttf_parser::OutlineBuilder;
+use rex::{Backend, font::common::GlyphId, GraphicsBackend, FontBackend};
+use owned_ttf_parser::OutlineBuilder;
 use web_sys::{CanvasRenderingContext2d, CanvasWindingRule};
+
+use crate::owned_math_font::{TtfMathFont, into};
 
 
 
@@ -8,7 +10,7 @@ use web_sys::{CanvasRenderingContext2d, CanvasWindingRule};
 pub struct CanvasContext<'a>(pub &'a CanvasRenderingContext2d);
 
 
-impl<'a> Backend<TtfMathFont<'a>> for CanvasContext<'_> {}
+impl<'a, 'b> Backend<TtfMathFont<'a, 'b>> for CanvasContext<'_> {}
 
 impl GraphicsBackend for CanvasContext<'_> {
     fn rule(&mut self, pos: rex::Cursor, width: f64, height: f64) {
@@ -27,8 +29,8 @@ impl GraphicsBackend for CanvasContext<'_> {
 }
 
 
-impl FontBackend<TtfMathFont<'_>> for CanvasContext<'_> {
-    fn symbol(&mut self, pos: rex::Cursor, gid: GlyphId, scale: f64, font: &TtfMathFont<'_>) {
+impl FontBackend<TtfMathFont<'_, '_>> for CanvasContext<'_> {
+    fn symbol(&mut self, pos: rex::Cursor, gid: GlyphId, scale: f64, font: &TtfMathFont<'_, '_>) {
         let canvas = self.0;
         
         canvas.save();
@@ -78,7 +80,7 @@ impl FontBackend<TtfMathFont<'_>> for CanvasContext<'_> {
 
         let mut builder = Builder {canvas,};
 
-        font.font().outline_glyph(gid.into(), &mut builder);
+        font.font().outline_glyph(into(gid), &mut builder);
         builder.fill();
         canvas.restore();
 

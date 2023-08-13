@@ -5,3 +5,4 @@ maths-preview-web/bin/
 maths-preview-web/www/
 wasm-pack.log
 clients/libreoffice-write/InsertFromMathsPreview.oxt
+clients/google-docs/out/

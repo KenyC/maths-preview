@@ -1,15 +1,13 @@
-#[macro_use]
-mod utils;
 mod error;
 mod canvas;
-mod ui;
+mod owned_math_font;
 
 use canvas::CanvasContext;
-use rex::{font::{backend::ttf_parser::TtfMathFont, FontContext}, parser::parse, layout::Grid, Renderer};
-use ui::{ErrorBar, initiate_download_file};
+use owned_math_font::TtfMathFont;
+use rex::{font::FontContext, parser::parse, layout::Grid, Renderer};
 use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement, HtmlElement, Blob,};
-use utils::set_panic_hook;
 use wasm_bindgen::prelude::*;
+use owned_ttf_parser::{OwnedFace, AsFaceRef};
 use error::{AppError, AppResult};
 
 // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global
@@ -19,170 +17,41 @@ use error::{AppError, AppResult};
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
 
-#[wasm_bindgen]
-extern "C" {
-    // Use `js_namespace` here to bind `console.log(..)` instead of just
-    // `log(..)`
-    #[wasm_bindgen(js_namespace = console)]
-    fn log(s: &str);
-}
-
 
 const FONT_FILE : &[u8] = include_bytes!("../resources/LibertinusMath-Regular.otf");
 // const FONT_FILE : &[u8] = include_bytes!("../resources/LibertinusMath-Regular.woff2");
 
-// Called when the wasm module is instantiated
-#[wasm_bindgen(start)]
-pub fn main() -> Result<(), JsValue> {
-    set_panic_hook();
+// static FONT_CONTEXT: RefCell<Option<OwnedFace>> = RefCell::default();
 
 
-    // -- Extract document
-    let window = web_sys::window().unwrap();
-    let document = window.document().unwrap();
+#[wasm_bindgen]
+pub struct Context {
+    face : *const OwnedFace,
+}
 
+impl Context {
+    pub fn as_ref<'a>(& 'a self) -> & 'a OwnedFace {
+        unsafe { self.face.as_ref::<'a>().unwrap() }
+    }
 
-    // -- Get error <div>
-    let error_bar = document.get_element_by_id("error").unwrap();
-    let error_bar = ErrorBar::new(error_bar);
+    pub fn new(value : Box<OwnedFace>) -> Self {
+        Self { face: Box::leak(value) }
+    }
+}
 
+#[wasm_bindgen]
+pub fn init_font() -> Context {
+    let font = Box::new(owned_ttf_parser::OwnedFace::from_vec(FONT_FILE.to_vec(), 0).unwrap());
+    Context::new(font)
+}
 
-    // -- Load math font
-    error_bar.set_text("Loading math font ...");
-    let font = ttf_parser::Face::parse(FONT_FILE, 0).unwrap();
-    let math_font  = std::rc::Rc::new(TtfMathFont::new(font).unwrap());
-
-
-
-
-
-    // -- Get canvas & edit element
-    let canvas = document.get_element_by_id("canvas").unwrap();
-    let canvas: web_sys::HtmlCanvasElement = canvas
-        .dyn_into::<web_sys::HtmlCanvasElement>().unwrap()
-        ;
-    let context = canvas
-        .get_context("2d").unwrap().unwrap()
-        .dyn_into::<web_sys::CanvasRenderingContext2d>().unwrap();
-    let text_edit =
-        document
-        .get_element_by_id("formula").unwrap()
-        .dyn_into::<web_sys::HtmlInputElement>().ok().unwrap()
-    ;
-    // let context = CanvasContext(&context);
-
-
-
-
-
-    // -- Initial set-up
-    error_bar.set_text("Setting up page & handlers ...");
-    let body = document.body().unwrap();
-    resize_canvas_to_body_size(&body, &canvas);
-    update_canvas(&text_edit.value(), CanvasContext(&context), &math_font).unwrap_or(());
-
-
-
-
-
-    // -- Resize handler
-    let resize_handler = Closure::wrap(Box::new(clone!(
-        canvas 
-        => move || {
-            resize_canvas_to_body_size(&body, &canvas);
-        }
-    )) as Box<dyn Fn()>
-    );
-    window.set_onresize(Some(resize_handler.as_ref().unchecked_ref()));
-    resize_handler.forget();
-
-
-
-
-
-
-
-
-
-    // -- Text edit handler
-    let oninput_handler = Closure::wrap(Box::new(
-        clone!(
-        context, text_edit, math_font, error_bar 
-        => move || {
-            let text = text_edit.value();
-            if let Err(err) = update_canvas(&text, CanvasContext(&context), &math_font) {
-                let human_readable_err = err.human_readable();
-                log(&human_readable_err);
-                error_bar.set_text(&human_readable_err);
-            }
-            else {
-                error_bar.hide();
-            }
-        })
-    ) as Box<dyn Fn()>);
-    text_edit.set_oninput(Some(oninput_handler.as_ref().unchecked_ref()));
-    oninput_handler.forget();
-
-
-
-
-
-    // -- Render button & handler
-    let button = document
-        .get_element_by_id("render").unwrap()
-        .dyn_into::<web_sys::HtmlButtonElement>().ok().unwrap()
-    ;
-    let start_download = Closure::wrap(Box::new(
-        clone!(document => move |blob| {
-            initiate_download_file(&document, &blob, None).unwrap();
-        })
-    ) as Box<dyn Fn(Blob)>);
-    let onclick_handler = Closure::wrap(
-        Box::new(clone!(
-            document, error_bar, text_edit, math_font
-            =>
-            move || {
-                error_bar.set_text("Preparing image...");
-                let text = text_edit.value();
-
-                const FONT_SIZE_EXPORT : f64 = 50.;
-                let (layout, _a, formula_metrics) = layout_and_size(&math_font, FONT_SIZE_EXPORT, &text).unwrap();
-
-                let bbox   = formula_metrics.bbox;
-                let width  = bbox.width();
-                let height = bbox.height();
-                const DPI : f64 = 96.;
-                const INCH_PER_POINT : f64  = 1. / 72.;
-                const PIXELS_PER_POINT : f64 = DPI * INCH_PER_POINT;
-                log(&format!("{} x {}", width, height,));
-                let offscreen_canvas = 
-                    document
-                    .create_element("canvas").unwrap()
-                    .dyn_into::<HtmlCanvasElement>().unwrap()
-                ;
-                offscreen_canvas.set_width ((width  * PIXELS_PER_POINT) as u32);        
-                offscreen_canvas.set_height((height * PIXELS_PER_POINT) as u32);        
-                let context = offscreen_canvas
-                    .get_context("2d").unwrap().unwrap()
-                    .dyn_into::<CanvasRenderingContext2d>().unwrap();
-
-
-                let renderer = Renderer::new();
-                render_layout(&mut CanvasContext(&context), None, &formula_metrics, renderer, layout).unwrap();
-
-                offscreen_canvas.to_blob(start_download.as_ref().unchecked_ref()).unwrap();
-
-                error_bar.hide();
-            }
-        )) as Box<dyn Fn()>
-    );
-    button.set_onclick(Some(onclick_handler.as_ref().unchecked_ref()));
-    onclick_handler.forget();
-
-
-    error_bar.hide();
-
-    Ok(())
+#[wasm_bindgen]
+pub fn render_formula_no_err(
+    context : &Context,
+    formula : &str, 
+    canvas : &CanvasRenderingContext2d
+) -> () {
+    render_formula(context, formula, canvas).unwrap()
 }
 
 fn resize_canvas_to_body_size(body :  &HtmlElement, canvas : &HtmlCanvasElement) {
@@ -194,20 +63,26 @@ fn resize_canvas_to_body_size(body :  &HtmlElement, canvas : &HtmlCanvasElement)
     canvas.set_height(client_height as u32);        
 }
 
-fn update_canvas<'a>(formula : &str, context : CanvasContext, math_font : &TtfMathFont<'a>) -> AppResult<()> {
-    render_formula(formula, context, math_font)
-}
 
+fn render_formula(
+    context : &Context,
+    formula : &str, 
+    canvas  : &CanvasRenderingContext2d
+) -> AppResult<()> {
+    {
+        let font = context.as_ref().as_face_ref();
+        let math_font  = TtfMathFont::new(font).unwrap();
 
-fn render_formula<'a>(formula : &str, mut context : CanvasContext, math_font : &TtfMathFont<'a>) -> AppResult<()> {
-    let (layout, _a, formula_metrics) = layout_and_size(&math_font, 10., formula)?;
+        let mut context = CanvasContext(canvas);
+        let (layout, _a, formula_metrics) = layout_and_size(&math_font, 10., formula)?;
 
-    let canvas_size = get_canvas_size(context);
-    context.0.clear_rect(0., 0., canvas_size.0, canvas_size.1);
-    let renderer = Renderer::new();
-    render_layout(&mut context, Some(canvas_size), &formula_metrics, renderer, layout)?;
+        let canvas_size = get_canvas_size(context);
+        context.0.clear_rect(0., 0., canvas_size.0, canvas_size.1);
+        let renderer = Renderer::new();
+        render_layout(&mut context, Some(canvas_size), &formula_metrics, renderer, layout)?;
 
-    Ok(())
+        Ok(())
+    }
 }
 
 fn get_canvas_size(context: CanvasContext) -> (f64, f64) {
@@ -218,7 +93,7 @@ fn get_canvas_size(context: CanvasContext) -> (f64, f64) {
 }
 
 
-fn layout_and_size<'a, 'f>(font: &'f TtfMathFont<'a>, font_size : f64, formula: &str) -> Result<(rex::layout::Layout<'f, TtfMathFont<'a>>, Renderer, Metrics), AppError> {
+fn layout_and_size<'a, 'f, 'b>(font: &'f TtfMathFont<'a, 'b>, font_size : f64, formula: &str) -> Result<(rex::layout::Layout<'f, TtfMathFont<'a, 'b>>, Renderer, Metrics), AppError> {
     let parse_node = parse(formula).map_err(|e| AppError::ParseError(format!("{}", e)))?;
 
     // Create node
@@ -235,11 +110,11 @@ fn layout_and_size<'a, 'f>(font: &'f TtfMathFont<'a>, font_size : f64, formula: 
 
     // Size
     let renderer = Renderer::new();
-    let formula_bbox = renderer.size(&layout);
+    let formula_bbox = layout.size();
 
     // Create metrics
     let metrics = Metrics {
-        bbox: BBox::new(formula_bbox.0, formula_bbox.1, formula_bbox.2, formula_bbox.3,),
+        bbox: BBox::from_typographic(0., formula_bbox.depth, formula_bbox.width, formula_bbox.height,),
         baseline: depth / rex::dimensions::Px,
         font_size,
     };
@@ -348,4 +223,14 @@ impl BBox {
 
     #[inline]
     fn height(&self) -> f64 { self.y_max - self.y_min }
+
+    /// This assumes the baseline is at y = 0
+    pub fn from_typographic(x_min: f64, depth: f64, x_max: f64, height: f64) -> Self { 
+        // height is signed distance from baseline to top of the glyph's bounding box
+        // height > 0 means that top of bouding box is above baseline (i.e. y_min)
+        // above in the screen's coordinate system means Y < 0
+        // So y_min = - height
+        // Similar reasoning for depth
+        Self { x_min, y_min : -height, x_max, y_max : -depth } 
+    }
 }
