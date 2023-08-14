@@ -2,56 +2,90 @@
 <html>
   <head>
     <meta content="text/html;charset=utf-8" http-equiv="Content-Type"/>
-    <!-- Note the usage of `type=module` here as this is an ES6 module -->
     <script type="module">
-      // Use ES module import syntax to import functionality from the module
-      // that we have compiled.
-      //
-      // Note that the `default` import is an initialization function which
-      // will "boot" the module and make it ready to use. Currently browsers
-      // don't support natively imported WebAssembly as an ES module, but
-      // eventually the manual initialization won't be required!
-      import init from './maths_preview_web.js';
+      import init, { 
+        init_font, 
+        render_formula_to_canvas_no_err,
+        render_formula_to_svg 
+      } from './maths_preview_web.js';
+
+      let canvas;
+      let canvas_context;
+      let font_context;
+      let formula_input;
+      let save_button;
+      let format_picker;
 
       async function run() {
-        // First up we need to actually load the wasm file, so we use the
-        // default export to inform it where the wasm file is located on the
-        // server, and then we wait on the returned promise to wait for the
-        // wasm to be loaded.
-        //
-        // It may look like this: `await init('./pkg/without_a_bundler_bg.wasm');`,
-        // but there is also a handy default inside `init` function, which uses
-        // `import.meta` to locate the wasm file relatively to js file.
-        //
-        // Note that instead of a string you can also pass in any of the
-        // following things:
-        //
-        // * `WebAssembly.Module`
-        //
-        // * `ArrayBuffer`
-        //
-        // * `Response`
-        //
-        // * `Promise` which returns any of the above, e.g. `fetch("./path/to/wasm")`
-        //
-        // This gives you complete control over how the module is loaded
-        // and compiled.
-        //
-        // Also note that the promise, when resolved, yields the wasm module's
-        // exports which is the same as importing the `*_bg` module in other
-        // modes
         await init();
 
+        // -- initialize all protagonists
+        font_context = init_font();
+        canvas        = document.getElementById("canvas");
+        formula_input = document.getElementById("formula");
+        save_button   = document.getElementById("save");
+        format_picker = document.getElementById("saveFormat");
+        canvas_context = canvas.getContext("2d");
+
+
+        // -- Resize Canvas to maximal width
+        resizeCanvas(); // <- this takes care of the first render
+        let observer = new ResizeObserver(() => {
+          resizeCanvas();
+          renderFormula();
+        }); 
+        observer.observe(canvas);
+
+        // -- Set canvas auto-update
+        formula_input.addEventListener("input", renderFormula);
+        
+        // -- Set save function
+        save_button.addEventListener("click", saveFormula)
+
       }
 
+
+
+
+      function triggerDownloadText(filename, content) {
+        // Create a Blob with the content
+        const blob = new Blob([content], { type: "image/svg+xml" });
+        
+        // Generate a URL for the Blob
+        const url = URL.createObjectURL(blob);
+        
+        // Create a download link
+        const downloadLink = document.createElement("a");
+        downloadLink.href = url;
+        downloadLink.download = filename; // Specify the filename
+        
+        // Trigger a click event on the link
+        document.body.appendChild(downloadLink);
+        downloadLink.click();
+        
+        // Clean up
+        document.body.removeChild(downloadLink);
+        URL.revokeObjectURL(url);
+      }
+
+      function saveFormula() {
+        const formula = formula_input.value;
+        const svg_render = render_formula_to_svg(font_context, formula);
+        triggerDownloadText("formula.svg", svg_render);
+      }
+
+      function renderFormula() {
+        const formula = formula_input.value;
+        render_formula_to_canvas_no_err(font_context, formula, canvas_context);
+      }
+
+
+      function resizeCanvas(){
+        canvas.width  = canvas.clientWidth;
+        canvas.height = canvas.clientHeight;
+      }
 
       run();
-    </script>
-    <script type="text/javascript">
-      function kill_download_link() {
-        let element = document.getElementById("downloadlink"); 
-        element.parentNode.removeChild(element);
-      }
     </script>
     <style>
       #formula {
@@ -64,6 +98,8 @@
       }
       #canvas {
         border: solid 1pt black;
+        display: block;
+        width: 100%;
       }
       .invisible {
         display: none;
@@ -75,7 +111,11 @@
     <canvas id="canvas"></canvas>
     <div id="error"></div>
     <div id="toolbar">
-      <button type="button" id="render">Save as PNG...</button>
+      <select id="saveFormat" name="saveFormat">
+        <option value="svg">.svg</option>
+        <!-- <option value="png">.png</option> -->
+      </select><br>
+      <button type="button" id="save">Save</button>
     </div>
   </body>
 </html>
