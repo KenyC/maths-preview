@@ -1,0 +1,19 @@
+#formula {
+	width: 100%;
+}
+#error {
+	color: red;
+}
+#toolbar {
+	display: flex;
+	justify-content: center;
+	align-items: center;
+}
+#canvas {
+	border: solid 1pt black;
+	display: block;
+	width: 100%;
+}
+.invisible {
+	display: none;
+}
