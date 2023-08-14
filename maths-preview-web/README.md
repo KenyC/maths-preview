@@ -2,7 +2,7 @@
 
 Type formulas, see them rendered in real-time in your browser, save the result as an image.
 
-See a hosted version [here]()
+See a hosted version [here](https://maths-preview.netlify.app/).
 
 ## Building
 
