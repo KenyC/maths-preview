@@ -1,5 +1,9 @@
 # Maths Preview for the web
 
+Type formulas, see them rendered in real-time in your browser, save the result as an image.
+
+See a hosted version [here]()
+
 ## Building
 
 Install the prerequisites:
@@ -17,7 +21,7 @@ source build.sh
 
 ## Running locally
 
-Start a server in folder `www/`, e.g.
+After building, start a server in folder `www/`, e.g.
 
 ```bash
 python -m http.server
