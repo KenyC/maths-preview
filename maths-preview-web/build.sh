@@ -1,7 +1,9 @@
 #!/usr/bin/bash
+set -e
 
 if [ -n "$NETLIFY" ]; then
     rustup toolchain install stable --profile minimal --target wasm32-unknown-unknown
+    cargo install wasm-bindgen-cli
 fi
 
 mkdir -p www
