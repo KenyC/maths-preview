@@ -50,12 +50,14 @@ pub fn init_font() -> Context {
 }
 
 #[wasm_bindgen]
-pub fn render_formula_to_canvas_no_err(
+pub fn render_formula_to_canvas_js_err(
     context : &Context,
     formula : &str, 
     canvas : &CanvasRenderingContext2d
-) -> () {
-    render_formula_to_canvas(context, formula, canvas).unwrap()
+) -> Result<(), JsValue> {
+    render_formula_to_canvas(context, formula, canvas).map_err(|e| {
+        JsValue::from_str(&e.human_readable())
+    })
 }
 
 
