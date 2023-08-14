@@ -36,7 +36,7 @@ impl GraphicsBackend for SvgContext {
 			));
 	}
 
-	fn begin_color(&mut self, color: rex::RGBA) {
+	fn begin_color(&mut self, _color: rex::RGBA) {
 		unimplemented!()
 	}
 

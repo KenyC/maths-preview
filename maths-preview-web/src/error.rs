@@ -1,5 +1,4 @@
 use rex::error::{LayoutError, FontError};
-use wasm_bindgen::prelude::*;
 
 #[derive(Debug,)]
 pub enum AppError {

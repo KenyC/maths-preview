@@ -3,12 +3,12 @@ mod canvas;
 mod svg;
 mod owned_math_font;
 
-use std::todo;
+
 
 use canvas::CanvasContext;
 use owned_math_font::TtfMathFont;
-use rex::{font::{FontContext, common::GlyphId}, parser::parse, layout::{Grid, engine::layout}, Renderer, FontBackend, Cursor};
-use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement, HtmlElement, Blob,};
+use rex::{font::{FontContext}, parser::parse, layout::{engine::layout}, Renderer};
+use web_sys::{CanvasRenderingContext2d,};
 use wasm_bindgen::prelude::*;
 use owned_ttf_parser::{OwnedFace, AsFaceRef};
 use error::{AppError, AppResult};
@@ -17,9 +17,9 @@ use crate::svg::SvgContext;
 
 // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global
 // allocator.
-#[cfg(feature = "wee_alloc")]
-#[global_allocator]
-static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
+// #[cfg(feature = "wee_alloc")]
+// #[global_allocator]
+// static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
 
 
@@ -124,7 +124,6 @@ fn layout_and_size<'a, 'f, 'b>(font: &'f TtfMathFont<'a, 'b>, font_size : f64, f
     let metrics = Metrics {
         bbox: BBox::from_typographic(0., formula_bbox.depth, formula_bbox.width, formula_bbox.height,),
         baseline: formula_bbox.depth,
-        font_size,
     };
 
     Ok((layout, metrics))
@@ -211,7 +210,6 @@ fn render_layout(
 struct Metrics {
     bbox      : BBox,
     baseline  : f64,
-    font_size : f64,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -223,6 +221,7 @@ struct BBox {
 }
 
 impl BBox {
+    #[allow(unused)]
     fn new(x_min: f64, y_min: f64, x_max: f64, y_max: f64) -> Self { Self { x_min, y_min, x_max, y_max } }
 
     #[inline]

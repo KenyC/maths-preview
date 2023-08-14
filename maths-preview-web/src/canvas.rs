@@ -1,3 +1,5 @@
+use std::unimplemented;
+
 use rex::{Backend, font::common::GlyphId, GraphicsBackend, FontBackend};
 use owned_ttf_parser::OutlineBuilder;
 use web_sys::{CanvasRenderingContext2d, CanvasWindingRule};
@@ -20,12 +22,13 @@ impl GraphicsBackend for CanvasContext<'_> {
         canvas.fill();
     }
 
-    fn begin_color(&mut self, color: rex::RGBA) {
+    fn begin_color(&mut self, _color: rex::RGBA) {
+        unimplemented!()
     }
 
     fn end_color(&mut self) {
+        unimplemented!()
     }
-    // add code here
 }
 
 
