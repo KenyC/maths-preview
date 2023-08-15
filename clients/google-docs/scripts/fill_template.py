@@ -7,15 +7,15 @@ with open("src/sidebar_template.html") as f:
 with open("src/setupui.js") as f:
 	setupui = f.read()
 
-with open("out/wasmbytecode.js") as f:
+with open("build/wasmbytecode.js") as f:
 	wasmbytecode = f.read()
 
-with open("out/initwasm.js") as f:
+with open("build/initwasm.js") as f:
 	initwasm = f.read()
 
 
 
-with open("out/sidebar.html", "w") as f:
+with open("build/sidebar.html", "w") as f:
 	f.write(template.substitute(
 		setupui      = setupui,
 		wasmbytecode = wasmbytecode,

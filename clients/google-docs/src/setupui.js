@@ -1,22 +1,9 @@
-let context;
+let font_context;
+let canvas_context;
+let formula_input;
+let insert_button;
 // TODO: display loading message
 // TODO: catch error in rendering
-
-
-/**
-* On document load, assign click handlers to each button and try to load the
-* user's origin and destination language preferences if previously set.
-*/
-$(function() {
-  $('#compile-formula').click(runTranslation);
-  $('#insert-text').click(insertText);
-  // load WASM
-  const wasm_bytearray = base64ToArray(wasm_bytecode);
-  console.log("Started initialization ...");
-  initSync(wasm_bytearray);
-  context = init_font();
-  console.log("done initialization.");
-});
 
 
 /**
@@ -36,34 +23,29 @@ function base64ToArray(base64String) {
 
 
 /**
-* Runs a server-side function to translate the user-selected text and update
-* the sidebar UI with the resulting translation.
+* Render formula in input text to the canvas below
+* 
 */
-function runTranslation() {
-  console.log("BHDT");
-  var canvas = $("#output-canvas")[0]; // [0] is used to access the DOM element from the jQuery object
-  
-  // Check if the browser supports the canvas element
-  if (canvas.getContext) {
-    var ctx = canvas.getContext("2d");
-    var textarea = document.getElementById('formula_input');
-    var formula = textarea.value;
+function renderFormula() {
+  let formula = formula_input.value;
 
-    console.log("Started rendering...");
-    render_formula_no_err(context, formula, ctx);
+  console.log("Started rendering...");
+  try {
+    render_formula_to_canvas_js_err(font_context, formula, canvas_context);
     console.log("done rendering");
-  } else {
-    console.log("Canvas is not supported in this browser.");
+  }
+  catch(error) {
+    console.log(error);
   }
 }
 
 /**
- * Runs a server-side function to insert the translated text into the document
+ * Runs a server-side function to insert the rendered image into the document
  * at the user's cursor or selection.
  */
-function insertText() {
+function insertSvgImage() {
   this.disabled = true;
-  $('#error').remove();
+  // $('#error').remove();
   google.script.run
     .withSuccessHandler(
      function(returnSuccess, element) {
@@ -71,11 +53,11 @@ function insertText() {
      })
     .withFailureHandler(
      function(msg, element) {
-       showError(msg, $('#button-bar'));
+       // showError(msg, $('#button-bar'));
        element.disabled = false;
      })
     .withUserObject(this)
-    .insertText($('#translated-text').val());
+    .insertSvgImage(formula_input.value);
 }
 
 /**
@@ -84,7 +66,40 @@ function insertText() {
  * @param {string} msg The error message to display.
  * @param {DOMElement} element The element after which to display the error.
  */
-function showError(msg, element) {
-  const div = $('<div id="error" class="error">' + msg + '</div>');
-  $(element).after(div);
+// function showError(msg, element) {
+//   const div = $('<div id="error" class="error">' + msg + '</div>');
+//   $(element).after(div);
+// }
+
+document.addEventListener("DOMContentLoaded", onLoad);
+
+function onLoad() {
+  // Load WASM
+  const wasm_bytearray = base64ToArray(wasm_bytecode);
+  console.log("Started initialization ...");
+  initSync(wasm_bytearray);
+  font_context = init_font();
+  console.log("done initialization.");
+
+
+  // Get HTML elements
+  insert_button = document.getElementById('insert-button');
+  formula_input = document.getElementById('formula-input');
+  let canvas = document.getElementById("output-canvas");
+  if(canvas.getContext) {
+    canvas_context = canvas.getContext("2d");
+  }
+  else {
+    console.log("Canvas not supported in this browser.");
+    return;
+  }
+
+  formula_input.addEventListener("input", renderFormula);
+  renderFormula();
+
+  insert_button.addEventListener("click", insertSvgImage);
+
+  // document.getElementById('insert-text').addEventListener('click', insertText);
+  // .addEventListener('click', renderFormula);
+  // .addEventListener('click', renderFormula);
 }
