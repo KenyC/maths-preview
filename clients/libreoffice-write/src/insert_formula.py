@@ -81,9 +81,9 @@ def insert_formula(block):
 	metainfo = launch_maths_preview(settings["MathsPreviewPath"], char_height, path, maths_font = settings.get("MathsFont"), initial_formula = initial_formula, custom_cmd_file = settings.get("CustomCommandFile"))
 	if metainfo is None:
 		return
-	width_pt  = metainfo["metrics"]["bbox"]["x_max"] - metainfo["metrics"]["bbox"]["x_min"] 
-	height_pt = metainfo["metrics"]["bbox"]["y_max"] - metainfo["metrics"]["bbox"]["y_min"]
-	if width_pt == 0 or height_pt == 0:
+	width_px  = metainfo["metrics"]["bbox"]["x_max"] - metainfo["metrics"]["bbox"]["x_min"] 
+	height_px = metainfo["metrics"]["bbox"]["y_max"] - metainfo["metrics"]["bbox"]["y_min"]
+	if width_px == 0 or height_px == 0:
 		return
 
 	#######################################
@@ -97,12 +97,12 @@ def insert_formula(block):
 	if is_new_text_graphic_object:
 		text_graphic_object = doc.createInstance("com.sun.star.text.TextGraphicObject")
 
-	fill_text_graphic_object_with_shape(text_graphic_object, graphic, width_pt, height_pt, description)
+	fill_text_graphic_object_with_shape(text_graphic_object, graphic, width_px, height_px, description)
 	
 	if block:
 		make_block(text_graphic_object)
 	else:
-		baseline_percentage = metainfo["metrics"]["baseline"] / height_pt
+		baseline_percentage = metainfo["metrics"]["baseline"] / height_px
 		make_inline(text_graphic_object, baseline_percentage)
 
 
@@ -179,12 +179,14 @@ def create_graphic_object_shape_from_path(doc, graphic_provider, path,):
 
 
 
-def fill_text_graphic_object_with_shape(text_graphic_object, graphic, width_pt, height_pt, description = None):
-	# desired unit is 1/100mm
-	# 1 DTP = 1 / 72 in = 0.3527778mm = 35.27778 1/100mm
-	one100th_mm_per_dot = 35.277777777
-	logging.debug("size pt: {} x {}".format(width_pt, height_pt))
-	size = Size(round(width_pt * one100th_mm_per_dot), round(height_pt * one100th_mm_per_dot))
+def fill_text_graphic_object_with_shape(text_graphic_object, graphic, width_px, height_px, description = None):
+	# Desired unit is 1/100mm
+	# Assume as is standard 96 PPI 
+	# 1 px = 1 / 96 in = 0.26458333333mm = 26.458333333 1/100mmm
+	# 1 pt (DTP) = 1 / 72 in = 0.3527778mm = 35.27778 1/100mm
+	one100th_mm_per_px = 26.4583333333
+	logging.debug("size px: {} x {}".format(width_px, height_px))
+	size = Size(round(width_px * one100th_mm_per_px), round(height_px * one100th_mm_per_px))
 	logging.debug("size 1/100mm (pre-hack): {} x {}".format(size.Width, size.Height))
 	size.Width  += PADDING_HACK_CONSTANT_WIDTH 
 	size.Height += PADDING_HACK_CONSTANT_HEIGHT

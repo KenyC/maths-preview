@@ -5,17 +5,36 @@ A fast and minimal WYSIWYG for LateX mathematical formulas.
 
 <p align="center"><img src="screenshots/demo.gif" alt="Demo GIF" width="300px"/></p>
 
+Features:
 
-## Desiderata
+  - **Real-time rendering:** formula is updated instantly as you type.
+  - **SVG export:** formula renders can be saved as svg.
+  - **Desktop and web version:** try [it](https://maths-preview.netlify.app/) online or see below for desktop version.
+  - **Plug-ins:** integrates with [Sublime Text](#sublime-text) and [LibreOffice Writer](#libreoffice-writer).
 
- - **Real-time Rendering:** see things appear as you type them, not 250ms later. This is possible by using the ReX maths engine (in fact, a fork thereof) instead of calling TeX.
- - **Pluggability:** the previewer should be able to interface with and be launched from typesetting environments, such as text editors or word processors or standalone. See below for Sublime Text and LibreOffice Writer plugins.
+
 
 ## Overview
 
 ### Usage
 
-Launch the program (e.g. `cargo r`), write down a formula and see it update in the display in real-time. Close the app ; some output is generated. The option `-f` specifies whether this output is a SVG render of the formula or the simply the LateX code you typed in. The option `-o` specifies where the output file will be written. If left unspecified, the output will be provided on stdout. Using option `-i`, you can specify which formula is displayed on program start.
+ - Build and launch the program (from Cargo: `cargo r`), 
+ - Type a formula in text input
+ - See it update in the display in real-time. 
+ - Close the app ; some output is generated either on stdout or written to a file. 
+
+
+### Example
+
+Supposing you have the executable on your `$PATH` as `maths_preview`:
+
+```bash
+maths_preview -i "e^{i\pi}+1=0" -f svg -o /tmp/out.svg
+```
+
+ - `-f svg` specifies can be used to output a SVG render upon exit, `-f tex` just outputs the formula you typed in. 
+ - `-o` specifies where the output file will be written. If left unspecified, the output will be provided on stdout. 
+ - `-i` specifies which formula is displayed on program start.
 
 ### Full description of the options
 
@@ -38,9 +57,16 @@ Run:
 cargo b --release
 ```
 
-The program depends on some Rust crates and the GTK3 library. Cargo will take care of the Rust dependencies but you will need to install the GTK3 library and its development files yourself. The steps to install the development files needed for GTK3 depend on the OS and distribution. On Debian/Ubuntu: `sudo apt install libgtk-3-dev`.
+The program depends on some Rust crates and the GTK3 library. Cargo will take care of the Rust dependencies but you will need to install the GTK3 library and its development files yourself. 
 
-When build is complete, the executable should be under `target/release/maths_preview`. You can add it to your PATH, e.g. by copying it to in `~/bin`.
+The steps to install the development files needed for GTK3 depend on the OS and distribution. 
+
+  - Debian/Ubuntu (apt): `sudo apt install libgtk-3-dev`.
+  - Fedora/RHEL (dnf): `sudo dnf install gtk3-devel`
+  - Mac (brew): `brew install gtk+3`
+  - Windows: I'm unsure as of yet, [this guide](https://www.gtk.org/docs/installations/windows/) may help
+
+When build is complete, the executable should be under `target/release/maths_preview`. You can add it to your PATH, e.g. by copying it to in `~/bin` (Linux).
 
 ## Plugins
 

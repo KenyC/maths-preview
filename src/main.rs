@@ -216,7 +216,7 @@ fn setup_command_line(application: &Application) {
         gtk::glib::Char(b'd' as i8), 
         gtk::glib::OptionFlags::IN_MAIN,
         gtk::glib::OptionArg::None, 
-        "Whether to output some meta-info on stdout (baseline position, font size, formula, etc.). If 'outfile' is not specified and this option is used, stdout will contain both the output and the meta-info", 
+        "For SVG outputs, whether to output some meta-info on stdout (baseline position, font size, formula, etc). All measures reported are in SVG user units. If 'outfile' is not specified and this option is used, stdout will contain both the output and the meta-info. If 'format' is tex, this option does nothing.", 
         None,
     );
 
@@ -417,7 +417,7 @@ fn build_ui(app : &Application, font : TtfMathFont<'static>, app_context : AppCo
                 draw_formula(last_ok_string.borrow().as_str(), context, font.clone(), UI_FONT_SIZE, Some((width, height)), custom_cmd.borrow().deref()).unwrap_or(());
             },
         }
-        Inhibit(false)
+        glib::signal::Propagation::Proceed
     }));
 
 
@@ -440,7 +440,7 @@ fn build_ui(app : &Application, font : TtfMathFont<'static>, app_context : AppCo
         // TODO: error handling
         // Can't really see how to set an exit status code once the app is running
         save_to_output(&text, outfile.borrow().deref(), format, font.clone(), font_size, metainfo, custom_cmd.borrow().deref()).unwrap();
-        Inhibit(false)
+        glib::signal::Propagation::Proceed
     }));
 
     window.show_all();
