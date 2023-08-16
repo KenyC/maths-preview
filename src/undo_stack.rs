@@ -1,4 +1,4 @@
-use gtk::{EntryBuffer, Entry, traits::{EntryExt, EditableExt}};
+use gtk4::{EntryBuffer, Entry, prelude::{EntryExtManual, EditableExtManual, EntryBufferExtManual}, traits::{EditableExt, EntryExt}};
 
 #[derive(Debug)]
 enum EditEvent {

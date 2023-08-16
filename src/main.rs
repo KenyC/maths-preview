@@ -9,15 +9,17 @@ use std::ops::Deref;
 use std::path::PathBuf;
 use std::rc::Rc;
 
+use gtk4::prelude::{ApplicationExt, ActionMapExt, ApplicationExtManual, EditableExtManual, DrawingAreaExtManual};
+use gtk4::traits::{GtkApplicationExt, GtkWindowExt, EditableExt, WidgetExt, BoxExt};
 use rex::parser::macros::CommandCollection;
 use serde_json;
 
 use cairo::glib::VariantDict;
-use gtk::cairo::Context;
-use gtk::gio::SimpleAction;
-use gtk::glib::clone;
-use gtk::{prelude::*, DrawingArea, glib, Statusbar, Entry};
-use gtk::{Application, ApplicationWindow};
+use gtk4::cairo::Context;
+use gtk4::gio::SimpleAction;
+use gtk4::glib::clone;
+use gtk4::{DrawingArea, glib, Statusbar, Entry};
+use gtk4::{Application, ApplicationWindow};
 
 use rex::font::backend::ttf_parser::TtfMathFont;
 
@@ -176,36 +178,36 @@ fn main() {
 fn setup_command_line(application: &Application) {
     application.add_main_option(
         "mathfont", 
-        gtk::glib::Char(b'm' as i8), 
-        gtk::glib::OptionFlags::IN_MAIN, 
-        gtk::glib::OptionArg::Filename, 
+        gtk4::glib::Char(b'm' as i8), 
+        gtk4::glib::OptionFlags::IN_MAIN, 
+        gtk4::glib::OptionArg::Filename, 
         "Path to an OpenType maths font to use for render (default: STIX Maths, bundled in the executable)", 
         None,
     );
 
     application.add_main_option(
         "informula", 
-        gtk::glib::Char(b'i' as i8), 
-        gtk::glib::OptionFlags::IN_MAIN, 
-        gtk::glib::OptionArg::String, 
+        gtk4::glib::Char(b'i' as i8), 
+        gtk4::glib::OptionFlags::IN_MAIN, 
+        gtk4::glib::OptionArg::String, 
         &format!("Formula to edit (default: ${}$)", EXAMPLE_FORMULA), 
         None,
     );
 
     application.add_main_option(
         "outfile", 
-        gtk::glib::Char(b'o' as i8), 
-        gtk::glib::OptionFlags::IN_MAIN, 
-        gtk::glib::OptionArg::Filename, 
+        gtk4::glib::Char(b'o' as i8), 
+        gtk4::glib::OptionFlags::IN_MAIN, 
+        gtk4::glib::OptionArg::Filename, 
         "Output file ; if left unspecified, output is directed to stdout.", 
         None,
     );
 
     application.add_main_option(
         "styfile", 
-        gtk::glib::Char(b'y' as i8), 
-        gtk::glib::OptionFlags::IN_MAIN, 
-        gtk::glib::OptionArg::Filename, 
+        gtk4::glib::Char(b'y' as i8), 
+        gtk4::glib::OptionFlags::IN_MAIN, 
+        gtk4::glib::OptionArg::Filename, 
         "Reads a style file to provide custom command", 
         None,
     );
@@ -213,27 +215,27 @@ fn setup_command_line(application: &Application) {
 
     application.add_main_option(
         "metainfo", 
-        gtk::glib::Char(b'd' as i8), 
-        gtk::glib::OptionFlags::IN_MAIN,
-        gtk::glib::OptionArg::None, 
+        gtk4::glib::Char(b'd' as i8), 
+        gtk4::glib::OptionFlags::IN_MAIN,
+        gtk4::glib::OptionArg::None, 
         "For SVG outputs, whether to output some meta-info on stdout (baseline position, font size, formula, etc). All measures reported are in SVG user units. If 'outfile' is not specified and this option is used, stdout will contain both the output and the meta-info. If 'format' is tex, this option does nothing.", 
         None,
     );
 
     application.add_main_option(
         "format",
-        gtk::glib::Char(b'f' as i8),
-        gtk::glib::OptionFlags::IN_MAIN, 
-        gtk::glib::OptionArg::String, 
+        gtk4::glib::Char(b'f' as i8),
+        gtk4::glib::OptionFlags::IN_MAIN, 
+        gtk4::glib::OptionArg::String, 
         "Format of 'outfile' ('svg', 'tex') ; defaults to 'tex'.", 
         None,
     );
 
     application.add_main_option(
         "fontsize",
-        gtk::glib::Char(b's' as i8),
-        gtk::glib::OptionFlags::IN_MAIN, 
-        gtk::glib::OptionArg::Double, 
+        gtk4::glib::Char(b's' as i8),
+        gtk4::glib::OptionFlags::IN_MAIN, 
+        gtk4::glib::OptionArg::Double, 
         "Size of font in the SVG output (default: 10)", 
         None,
     );
@@ -321,14 +323,17 @@ fn build_ui(app : &Application, font : TtfMathFont<'static>, app_context : AppCo
 
 
     let text_field = Entry::builder()
-        .valign(gtk::Align::Center)
+        .valign(gtk4::Align::Center)
         .build()
     ;
 
     let draw_area = DrawingArea::builder()
         .height_request(250)
-        .expand(true)
-        .margin(3)
+        .vexpand(true)
+        .margin_top(3)
+        .margin_bottom(3)
+        .margin_start(3)
+        .margin_end(3)
         .build()
     ;
 
@@ -368,36 +373,39 @@ fn build_ui(app : &Application, font : TtfMathFont<'static>, app_context : AppCo
         undo_stack.borrow_mut().redo(text_field.clone());
     }));
 
-    let vbox = gtk::Box::builder()
-        .orientation(gtk::Orientation::Vertical)
+    let vbox = gtk4::Box::builder()
+        .orientation(gtk4::Orientation::Vertical)
         .spacing(0)
-        .margin(0)
+        .margin_start(0)
+        .margin_end(0)
+        .margin_top(0)
+        .margin_bottom(0)
         .build()
     ;
 
-    let scrolled_window = gtk::ScrolledWindow::builder()
-        .valign(gtk::Align::Start)
+    let scrolled_window = gtk4::ScrolledWindow::builder()
+        .valign(gtk4::Align::Start)
         .build()
     ;
-    scrolled_window.add(&text_field);
+    scrolled_window.set_child(Some(&text_field));
     // \oint_C \vec{E} \cdot \mathrm{d} \vec \ell= - \frac{\mathrm{d}}{\mathrm{d}t} \left( \int_S \vec{B}\cdot\mathrm{d} \vec{S} \right)
 
     status_bar.push(0, "Loading ...");
 
 
-    vbox.add(&scrolled_window);
-    vbox.add(&draw_area);
-    vbox.pack_start(&status_bar, false, true, 0);
-    window.add(&vbox);
+    vbox.append(&scrolled_window);
+    vbox.append(&draw_area);
+    vbox.prepend(&status_bar);
+    window.set_child(Some(&vbox));
 
     let last_ok_string = Rc::new(RefCell::new(EXAMPLE_FORMULA.to_string()));
 
-    draw_area.connect_draw(clone!(@strong font, @strong text_field, @strong last_ok_string, @strong status_bar, @strong custom_cmd => move |area, context| {
+    draw_area.set_draw_func(clone!(@strong font, @strong text_field, @strong last_ok_string, @strong status_bar, @strong custom_cmd => move |area, context, width, height| {
         let text = text_field.text();
         context.set_source_rgb(0.0, 0.0, 0.0);
 
-        let width  = area.allocated_width()  as f64;
-        let height = area.allocated_height() as f64; 
+        let width  = width   as f64;
+        let height = height  as f64; 
 
         let result = draw_formula(text.as_str(), context, font.clone(), UI_FONT_SIZE, Some((width, height)), custom_cmd.borrow().deref());
         match result {
@@ -417,7 +425,6 @@ fn build_ui(app : &Application, font : TtfMathFont<'static>, app_context : AppCo
                 draw_formula(last_ok_string.borrow().as_str(), context, font.clone(), UI_FONT_SIZE, Some((width, height)), custom_cmd.borrow().deref()).unwrap_or(());
             },
         }
-        glib::signal::Propagation::Proceed
     }));
 
 
@@ -429,13 +436,13 @@ fn build_ui(app : &Application, font : TtfMathFont<'static>, app_context : AppCo
         undo_stack.borrow_mut().insert_text(text, *pt, selection);
     }));
     text_field.connect_delete_text(clone!(@strong undo_stack => move |entry, start_pos, end_pos| {
-        let deleted_text = entry.chars(start_pos, end_pos).unwrap();
+        let deleted_text = entry.chars(start_pos, end_pos);
         let selection = get_selection(&entry);
         undo_stack.borrow_mut().delete_text(deleted_text.as_str(), start_pos, end_pos, selection);
     }));
 
 
-    window.connect_delete_event(clone!(@strong text_field, @strong outfile, @strong font, @strong custom_cmd => move |_, _| {
+    window.connect_close_request(clone!(@strong text_field, @strong outfile, @strong font, @strong custom_cmd => move |_| {
         let text = text_field.text();
         // TODO: error handling
         // Can't really see how to set an exit status code once the app is running
@@ -443,7 +450,7 @@ fn build_ui(app : &Application, font : TtfMathFont<'static>, app_context : AppCo
         glib::signal::Propagation::Proceed
     }));
 
-    window.show_all();
+    window.show();
     
 }
 
@@ -486,7 +493,7 @@ fn save_svg(path : &Output, formula : &str, font : Rc<TtfMathFont>, font_size : 
     let formula_bbox = &formula_metrics.bbox;
     let width  = formula_bbox.width();
     let height = formula_bbox.height();
-    let svg_surface = gtk::cairo::SvgSurface::for_stream(width, height, path.stream()?)?;
+    let svg_surface = gtk4::cairo::SvgSurface::for_stream(width, height, path.stream()?)?;
     let context = Context::new(svg_surface)?;
     // In Cairo SVG, we aren't at a liberty to specify the view box, only height and width
     // So we must translate so that the minimum y is 0
