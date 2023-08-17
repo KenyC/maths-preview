@@ -169,7 +169,7 @@ fn main() {
         // application.quit(); <- QUIT does not call delete window
     }));
     application.add_action(&action_close);
-    application.set_accels_for_action("app.quit", &["<Ctrl>Q", "Escape"]);
+    application.set_accels_for_action("app.quit", &["<Primary>Q", "Escape"]);
     
 
     application.run();
@@ -361,8 +361,8 @@ fn build_ui(app : &Application, font : TtfMathFont<'static>, app_context : AppCo
 
     app.add_action(&undo_action);
     app.add_action(&redo_action);
-    app.set_accels_for_action("app.undo", &["<Ctrl>Z"]);
-    app.set_accels_for_action("app.redo", &["<Ctrl><Shift>Z"]);
+    app.set_accels_for_action("app.undo", &["<Primary>Z"]);
+    app.set_accels_for_action("app.redo", &["<Primary><Shift>Z"]);
 
 
     undo_action.connect_activate(clone!(@strong text_field, @strong undo_stack => move |_, _| {
@@ -395,7 +395,7 @@ fn build_ui(app : &Application, font : TtfMathFont<'static>, app_context : AppCo
 
     vbox.append(&scrolled_window);
     vbox.append(&draw_area);
-    vbox.prepend(&status_bar);
+    vbox.append(&status_bar);
     window.set_child(Some(&vbox));
 
     let last_ok_string = Rc::new(RefCell::new(EXAMPLE_FORMULA.to_string()));
@@ -431,13 +431,13 @@ fn build_ui(app : &Application, font : TtfMathFont<'static>, app_context : AppCo
     text_field.connect_changed(clone!(@weak draw_area => move |_text_buffer| {
         draw_area.queue_draw()
     }));
-    text_field.connect_insert_text(clone!(@strong undo_stack => move |entry, text, pt| {
-        let selection = get_selection(&entry);
+    text_field.delegate().unwrap().connect_insert_text(clone!(@strong undo_stack => move |entry, text, pt| {
+        let selection = get_selection(entry);
         undo_stack.borrow_mut().insert_text(text, *pt, selection);
     }));
-    text_field.connect_delete_text(clone!(@strong undo_stack => move |entry, start_pos, end_pos| {
+    text_field.delegate().unwrap().connect_delete_text(clone!(@strong undo_stack => move |entry, start_pos, end_pos| {
         let deleted_text = entry.chars(start_pos, end_pos);
-        let selection = get_selection(&entry);
+        let selection = get_selection(entry);
         undo_stack.borrow_mut().delete_text(deleted_text.as_str(), start_pos, end_pos, selection);
     }));
 

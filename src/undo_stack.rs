@@ -1,4 +1,4 @@
-use gtk4::{EntryBuffer, Entry, prelude::{EntryExtManual, EditableExtManual, EntryBufferExtManual}, traits::{EditableExt, EntryExt}};
+use gtk4::{EntryBuffer, Entry, prelude::{EntryExtManual, EditableExtManual, EntryBufferExtManual}, traits::{EditableExt, EntryExt}, Editable};
 
 #[derive(Debug)]
 enum EditEvent {
@@ -76,7 +76,7 @@ impl UndoStack {
     pub fn undo(&mut self, entry : Entry) -> bool {
         if let Some(mut change) = self.past.pop() {
             let original_selection = change.original_selection;
-            change.original_selection = get_selection(&entry);
+            change.original_selection = get_selection(&entry.delegate().unwrap());
 
             change.event.unapply_change(entry.buffer());
             Self::set_selection(entry, original_selection);
@@ -131,7 +131,7 @@ impl UndoStack {
 
 }
 
-pub fn get_selection(entry: &Entry) -> (i32, i32) {
+pub fn get_selection(entry: &Editable) -> (i32, i32) {
     entry.selection_bounds().unwrap_or_else(||{
         let selection = entry.selection_bound();
         (selection, selection)
