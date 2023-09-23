@@ -8,15 +8,16 @@ clean:
 	rm -f $(OUTPUT)
 	
 zip:
-	zip -r $(OUTPUT) \
+	zip -MM -r $(OUTPUT) \
 		description.xml \
 		META-INF/manifest.xml \
 		Addons.xcu \
+		ToolbarState.xcu \
 		images/*.png \
 		src/* \
 		config/* \
 		dialogs/* \
-		package/license.txt 
+		package/LICENSE
 
 install:
 	unopkg validate $(OUTPUT)

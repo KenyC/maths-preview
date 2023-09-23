@@ -4,6 +4,7 @@
    <manifest:file-entry manifest:full-path="src/configuration.py" manifest:media-type="application/vnd.sun.star.uno-component;type=Python"/>
   <manifest:file-entry manifest:media-type="application/vnd.sun.star.framework-script" manifest:full-path="src"/>
   <manifest:file-entry manifest:media-type="application/vnd.sun.star.configuration-data" manifest:full-path="Addons.xcu"/>
+  <manifest:file-entry manifest:media-type="application/vnd.sun.star.configuration-data" manifest:full-path="ToolbarState.xcu"/>
   <manifest:file-entry manifest:full-path="config/config.xcs" manifest:media-type="application/vnd.sun.star.configuration-schema"/>
   <manifest:file-entry manifest:full-path="config/config.xcu" manifest:media-type="application/vnd.sun.star.configuration-data"/>
   <manifest:file-entry manifest:full-path="config/options.xcu" manifest:media-type="application/vnd.sun.star.configuration-data"/>

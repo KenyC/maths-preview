@@ -32,8 +32,8 @@ FORMATS = [
 
 # The width of the image reported by LO Write is the width of the SVG plus 27 hundredth of a mm
 # I don't know why this happens but it messes up size and alignement
-PADDING_HACK_CONSTANT_WIDTH  = 26.5 # 1/100mm
-PADDING_HACK_CONSTANT_HEIGHT = 26.5 # 1/100mm
+PADDING_HACK_CONSTANT_WIDTH  = 26.5  # 1/100mm
+PADDING_HACK_CONSTANT_HEIGHT = 26.45 # 1/100mm
 FORMULA_FILE = str(uuid.uuid4()) # always write to the same file to avoid building up large number of files in /tmp/
 
 def insert_block_formula(*args):
@@ -102,8 +102,9 @@ def insert_formula(block):
 	if block:
 		make_block(text_graphic_object)
 	else:
-		baseline_percentage = metainfo["metrics"]["baseline"] / height_px
-		make_inline(text_graphic_object, baseline_percentage)
+		baseline_px = metainfo["metrics"]["baseline"]
+		y_min_px    = metainfo["metrics"]["bbox"]["y_min"]
+		make_inline(text_graphic_object, y_min_px)
 
 
 	if is_new_text_graphic_object:
@@ -177,16 +178,16 @@ def create_graphic_object_shape_from_path(doc, graphic_provider, path,):
 
 
 
+# Desired unit is 1/100mm
+# Assume as is standard 96 PPI 
+# 1 px = 1 / 96 in = 0.26458333333mm = 26.458333333 1/100mmm
+# 1 pt (DTP) = 1 / 72 in = 0.3527778mm = 35.27778 1/100mm
+ONE100TH_MM_PER_PX = 26.4583333333
 
 
 def fill_text_graphic_object_with_shape(text_graphic_object, graphic, width_px, height_px, description = None):
-	# Desired unit is 1/100mm
-	# Assume as is standard 96 PPI 
-	# 1 px = 1 / 96 in = 0.26458333333mm = 26.458333333 1/100mmm
-	# 1 pt (DTP) = 1 / 72 in = 0.3527778mm = 35.27778 1/100mm
-	one100th_mm_per_px = 26.4583333333
 	logging.debug("size px: {} x {}".format(width_px, height_px))
-	size = Size(round(width_px * one100th_mm_per_px), round(height_px * one100th_mm_per_px))
+	size = Size(round(width_px * ONE100TH_MM_PER_PX), round(height_px * ONE100TH_MM_PER_PX))
 	logging.debug("size 1/100mm (pre-hack): {} x {}".format(size.Width, size.Height))
 	size.Width  += PADDING_HACK_CONSTANT_WIDTH 
 	size.Height += PADDING_HACK_CONSTANT_HEIGHT
@@ -205,11 +206,13 @@ def fill_text_graphic_object_with_shape(text_graphic_object, graphic, width_px, 
 
 
 
-def make_inline(text_graphic_object, baseline_percentage):
+def make_inline(text_graphic_object, y_min_px):
 	height = text_graphic_object.Size.Height
+	logging.debug("Height from Graphics Object {}".format(height))
 	text_graphic_object.AnchorType = AS_CHARACTER
 	text_graphic_object.VertOrient = 0
-	text_graphic_object.VertOrientPosition = -  (1 + baseline_percentage) * height + PADDING_HACK_CONSTANT_HEIGHT / 2
+	text_graphic_object.VertOrientPosition = - PADDING_HACK_CONSTANT_HEIGHT / 2 + y_min_px * ONE100TH_MM_PER_PX
+	logging.debug("text_graphic_object.VertOrientPosition {}".format(text_graphic_object.VertOrientPosition))
 
 
 
