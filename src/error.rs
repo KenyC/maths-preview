@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use rex::error::{LayoutError, FontError};
 use rex::parser::error::ParseError;
 use ttf_parser::FaceParsingError;
@@ -12,8 +14,8 @@ pub enum AppError {
     FaceParsingError(FaceParsingError),
 }
 
-impl AppError {
-    pub fn human_readable(&self) -> String {
+impl Display for AppError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let error_tag = match self {
             AppError::FontError(_) |
             AppError::FaceParsingError(_) |
@@ -33,7 +35,7 @@ impl AppError {
             AppError::LayoutError(LayoutError::Font(e)) => format!("{}", e),
         };
 
-        format!("{} : {}", error_tag, error_message)
+        write!(f, "{} : {}", error_tag, error_message)
     }
 }
 
