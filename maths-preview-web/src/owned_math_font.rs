@@ -1,7 +1,7 @@
 
 use std::convert::TryInto;
 
-use owned_ttf_parser::{math::GlyphPart, LazyArray16};
+use owned_ttf_parser::{math::GlyphPart, LazyArray16,OutlineBuilder};
 
 use rex::{font::{Constants, VariantGlyph, common::{GlyphInstruction, GlyphId}, Direction, Glyph}, dimensions::{Scale, Font, Em, Length}, error::FontError};
 
@@ -438,5 +438,42 @@ fn construct_glyphs(min_connector_overlap : u32, parts: LazyArray16<GlyphPart>, 
     instructions
 }
 
+struct OutlineBuilderCompatibilityLater<'a, T : rex_svg::OutlineBuilder>(& 'a mut T);
 
+impl<'a, T : rex_svg::OutlineBuilder> OutlineBuilder for OutlineBuilderCompatibilityLater<'a, T> {
+
+    fn move_to(&mut self, x: f32, y: f32) {
+        self.0.move_to(x, y)
+    }
+
+    fn line_to(&mut self, x: f32, y: f32) {
+        self.0.line_to(x, y);
+    }
+
+    fn quad_to(&mut self, x1: f32, y1: f32, x: f32, y: f32) {
+        self.0.quad_to(x1, y1, x, y);
+    }
+
+    fn curve_to(&mut self, x1: f32, y1: f32, x2: f32, y2: f32, x: f32, y: f32) {
+        self.0.curve_to(x1, y1, x2, y2, x, y);
+    }
+
+    fn close(&mut self) {
+        self.0.close();
+    }
+
+
+}
+
+
+use rex_svg::GivesOutline;
+impl GivesOutline for TtfMathFont<'_, '_> {
+    fn outline_glyph(&self, glyph_id : GlyphId, builder : &mut impl rex_svg::OutlineBuilder) {
+        self.font().outline_glyph(into(glyph_id), &mut OutlineBuilderCompatibilityLater(builder));
+    }
+    fn font_scale(&self) -> (f32, f32) {
+        let matrix = self.font_matrix();
+        (matrix.sx, matrix.sy)
+    }
+}
 

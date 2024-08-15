@@ -1,6 +1,5 @@
 mod error;
 mod canvas;
-mod svg;
 mod owned_math_font;
 
 
@@ -13,7 +12,7 @@ use wasm_bindgen::prelude::*;
 use owned_ttf_parser::{OwnedFace, AsFaceRef};
 use error::{AppError, AppResult};
 
-use crate::svg::SvgContext;
+use rex_svg::SvgContext;
 
 // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global
 // allocator.
@@ -201,7 +200,7 @@ fn render_layout(
     canvas_size: Option<(f64, f64)>, 
     formula_metrics: &Metrics, 
     layout: rex::layout::Layout<TtfMathFont>,
-) -> AppResult<()> {
+) {
     // let (x0, y0, x1, y1) = renderer.size(&node);
     context.0.save();
     let Metrics { bbox, .. } = formula_metrics;
@@ -214,7 +213,6 @@ fn render_layout(
 
 
     context.0.restore();
-    Ok(())
 }
 
 

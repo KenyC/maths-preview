@@ -13,3 +13,5 @@ rex = {git = "https://github.com/KenyC/ReX", features = ["ttfparser-fontparser",
 ttf-parser = "*"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+rex-svg = { path = "deps/rex-svg/", features=["ttf-parser"] }
+utf16string = "0.2.0"

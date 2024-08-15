@@ -1,7 +1,7 @@
 use std::rc::Rc;
 
 use cairo::Context;
-use rex::{Renderer, font::{backend::ttf_parser::TtfMathFont, FontContext}, parser::{macros::CommandCollection, parse_with_custom_commands}, layout::engine::layout};
+use rex::{font::{backend::ttf_parser::TtfMathFont, FontContext, MathFont}, layout::engine::layout, parser::{macros::CommandCollection, parse_with_custom_commands}, Renderer};
 use serde::Serialize;
 
 use crate::{geometry::{Metrics, BBox}, error::{AppResult, AppError}};
@@ -52,7 +52,7 @@ pub struct MetaInfo {
 }
 
 
-pub fn layout_and_size<'a, 'f>(font: &'f TtfMathFont<'a>, font_size : f64, formula: &str, custom_cmd : &CommandCollection) -> AppResult<(rex::layout::Layout<'f, TtfMathFont<'a>>, Metrics)> {
+pub fn layout_and_size<'f, T : MathFont>(font: &'f T, font_size : f64, formula: &str, custom_cmd : &CommandCollection) -> AppResult<(rex::layout::Layout<'f, T>, Metrics)> {
     let parse_node = parse_with_custom_commands(formula, custom_cmd).map_err(|e| AppError::ParseError(format!("{}", e)))?;
 
     // Create node
