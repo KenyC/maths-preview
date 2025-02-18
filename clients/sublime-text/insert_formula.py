@@ -13,6 +13,10 @@ class InsertFormulaCommand(sublime_plugin.TextCommand):
 		# Get current selection
 		sel    = self.view.sel()
 		region = next(iter(sel))
+		# If is in a LaTeX scope, we extend selection to that scope
+		if region.a == region.b:
+			self.view.expand_to_scope("text.tex.latex meta.environment.math")
+			
 		text   = self.view.substr(region)
 		command.extend(["-i", text])
 

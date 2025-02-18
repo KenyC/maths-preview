@@ -120,8 +120,8 @@ fn save_to_output(text: &str, outfile: &Output, format : Format, font : Rc<TtfMa
     eprintln!("Saving to {:?}", outfile);
 
     match format {
-        Format::Svg { glyph_as_text: textastext } => {
-            let metrics = save_svg(outfile, &text, font, font_size, custom_cmd, textastext)?;
+        Format::Svg { glyph_as_text } => {
+            let metrics = save_svg(outfile, &text, font, font_size, custom_cmd, glyph_as_text)?;
             if print_metainfo {
                 let metainfo = MetaInfo { metrics, formula: text.to_string() };
                 let json = serde_json::to_string(&metainfo);

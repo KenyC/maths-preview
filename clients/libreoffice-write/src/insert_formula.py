@@ -133,6 +133,7 @@ def launch_maths_preview(exe_path, char_height, path, maths_font = None, initial
 			"-s", str(char_height),
 			"-f", "svg", 
 			"-d", 
+			"-t", 
 			"-o", path
 		] +  additional_args
 		logging.debug(" ".join(cmd))
@@ -243,24 +244,24 @@ def msg_box(text):
 
 
 def get_apso_settings():
-    key = "/InsertFromMathsPreview.Settings"
-    reader = getConfigurationAccess(key)
-    groupnames = reader.ElementNames
-    settings = {}
-    for groupname in groupnames:
-        group = reader.getByName(groupname)
-        props = group.ElementNames
-        values = group.getPropertyValues(props)
-        settings.update({k: v for k, v in zip(props, values)})
+	key = "/InsertFromMathsPreview.Settings"
+	reader = getConfigurationAccess(key)
+	groupnames = reader.ElementNames
+	settings = {}
+	for groupname in groupnames:
+		group = reader.getByName(groupname)
+		props = group.ElementNames
+		values = group.getPropertyValues(props)
+		settings.update({k: v for k, v in zip(props, values)})
 
-    default_settings = {
-    	"MathsPreviewPath"  : "~/bin/maths_preview",
-    	"MathsFont"         : None,
-    	"CustomCommandFile" : None,
-    }
+	default_settings = {
+		"MathsPreviewPath"  : "~/bin/maths_preview",
+		"MathsFont"         : None,
+		"CustomCommandFile" : None,
+	}
 
-    for k, v in settings.items():
-    	if v is None or v.strip() == "":
-    		settings[k] = default_settings[k]
+	for k, v in settings.items():
+		if v is None or v.strip() == "":
+			settings[k] = default_settings[k]
 
-    return settings
+	return settings
