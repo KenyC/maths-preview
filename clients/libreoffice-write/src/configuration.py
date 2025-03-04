@@ -35,8 +35,9 @@ from com.sun.star.uno import Exception as UNOException
 from com.sun.star.awt.MessageBoxType import MESSAGEBOX, ERRORBOX, WARNINGBOX
 from com.sun.star.awt.MessageBoxResults import YES
 from com.sun.star.ui.dialogs.TemplateDescription import FILESAVE_AUTOEXTENSION, FILEOPEN_SIMPLE
-from utils import *
 
+from utils import *
+import settings_rw
 
 
 RR = None
@@ -100,10 +101,18 @@ class OptionsDialogHandler(unohelper.Base, XContainerWindowEventHandler):
 		name = window.getModel().Name
 		if name != "InsertFromMathsPreview_AllOptions":
 			return
-		editor     = window.getControl("tf_MathsPreviewPath")
-		options    = window.getControl("tf_MathsFont")
-		custom_cmd = window.getControl("tf_CustomCommandFile")
-		settings = {"names": ("MathsPreviewPath", "MathsFont", "CustomCommandFile"), "values": (editor.Text, options.Text, custom_cmd.Text)}
+
+		editor_control       = window.getControl("tf_MathsPreviewPath")
+		options_control      = window.getControl("tf_MathsFont")
+		custom_cmd_control   = window.getControl("tf_CustomCommandFile")
+		text_as_text_control = window.getControl("tf_TextAsText")
+
+		settings = {
+			"MathsPreviewPath" : editor_control.Text,
+			"MathsFont" : options_control.Text,
+			"CustomCommandFile" : custom_cmd_control.Text,
+			"TextAsText" : text_as_text_control.State == 1
+		}
 		self._configwriter(settings)
 
 	def _loadData(self, window, evName):
@@ -116,18 +125,22 @@ class OptionsDialogHandler(unohelper.Base, XContainerWindowEventHandler):
 				if not control.supportsService("com.sun.star.awt.UnoControlEdit"):
 					model = control.Model
 					model.Label = RR.resolvestring(model.Label)
+
 		settings = self._configreader()
-		for k, v in settings.items():
-			if v is None:
-				settings[k] = ""
 
 		if settings:
 			tf_MathsPreviewPath = window.getControl("tf_MathsPreviewPath")
+			tf_MathsPreviewPath.setText(settings["MathsPreviewPath"] if settings["MathsPreviewPath"] else "")
+
 			tf_MathsFont = window.getControl("tf_MathsFont")
+			tf_MathsFont.setText(settings["MathsFont"] if settings["MathsFont"] else "")
+
 			tf_CustomCommandFile = window.getControl("tf_CustomCommandFile")
-			tf_MathsPreviewPath.setText(settings["MathsPreviewPath"])
-			tf_MathsFont.setText(settings["MathsFont"])
-			tf_CustomCommandFile.setText(settings["CustomCommandFile"])
+			tf_CustomCommandFile.setText(settings["CustomCommandFile"] if settings["CustomCommandFile"] else "")
+
+			tf_TextAsText = window.getControl("tf_TextAsText")
+			tf_TextAsText.setState(1 if settings["TextAsText"] else 0)
+
 		return
 
 	def setup_buttons(self, window):
@@ -165,24 +178,12 @@ class OptionsDialogHandler(unohelper.Base, XContainerWindowEventHandler):
 		btn_PickExe.addActionListener(listener)
 
 
+
 	def _configreader(self):
-		settings = {}
-		try:
-			reader = getConfigurationAccess(self.CfgNode)
-			names = reader.ElementNames
-			values = reader.getPropertyValues(names)
-			settings = {k: v for k, v in zip(names, values)}
-		except Exception as e:
-			raise e
-		return settings
+		return settings_rw.read_settings(self.CfgNode)
 
 	def _configwriter(self, settings):
-		try:
-			writer = getConfigurationAccess(self.CfgNode, True)
-			writer.setPropertyValues(settings["names"], settings["values"])
-			writer.commitChanges()
-		except Exception as e:
-			raise e
+		settings_rw.save_settings(self.CfgNode, settings)
 
 	def chooseFile(self, ev, filters, field_name):
 		url = FileOpenDialog(
