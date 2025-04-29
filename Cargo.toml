@@ -9,7 +9,7 @@ edition = "2021"
 [dependencies]
 gtk4 = "0.7.2"
 cairo-rs = {version = "*", features=["svg"]}
-rex = {git = "https://github.com/KenyC/ReX", features = ["ttfparser-fontparser", "cairo-renderer"]}
-ttf-parser = "0.19.0"
+rex = {git = "https://github.com/KenyC/ReX", features = ["ttfparser-fontparser", "cairo-renderer"], rev="30ad53b09336db84d0cd07fab051465c72d88685"}
+ttf-parser = "*"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"

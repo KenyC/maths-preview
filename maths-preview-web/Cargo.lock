@@ -60,6 +60,7 @@ version = "0.1.0"
 dependencies = [
  "base64",
  "console_error_panic_hook",
+ "js-sys",
  "owned_ttf_parser",
  "rex",
  "wasm-bindgen",

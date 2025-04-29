@@ -1,4 +1,5 @@
-use rex::error::{LayoutError, FontError, ParseError};
+use rex::error::{LayoutError, FontError};
+use rex::parser::error::ParseError;
 use ttf_parser::FaceParsingError;
 
 #[derive(Debug,)]
@@ -63,7 +64,7 @@ impl From<FaceParsingError> for AppError {
     { Self::FaceParsingError(err) }
 }
 
-impl<'a> From<ParseError<'a>> for AppError {
+impl From<ParseError> for AppError {
     fn from(err: ParseError) -> Self 
     { Self::ParseError(err.to_string()) }
 }

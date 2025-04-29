@@ -56,8 +56,8 @@ pub fn layout_and_size<'a, 'f>(font: &'f TtfMathFont<'a>, font_size : f64, formu
     let parse_node = parse_with_custom_commands(formula, custom_cmd).map_err(|e| AppError::ParseError(format!("{}", e)))?;
 
     // Create node
-    let font_context = FontContext::new(font)?;
-    let layout_settings = rex::layout::LayoutSettings::new(&font_context, font_size, rex::layout::Style::Display);
+    let font_context = FontContext::new(font);
+    let layout_settings = rex::layout::LayoutSettings::new(&font_context).font_size(font_size);
     let layout = layout(&parse_node, layout_settings)?;
 
     let formula_bbox = layout.size();
