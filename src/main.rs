@@ -1,9 +1,11 @@
-pub mod undo_stack;
+pub mod undo;
 pub mod error;
 pub mod geometry;
+pub mod glyph_to_character;
 mod render;
 
 use std::cell::{RefCell, Cell};
+use std::collections::{HashMap, HashSet};
 use std::io::Write;
 use std::ops::Deref;
 use std::path::PathBuf;
@@ -12,6 +14,8 @@ use std::rc::Rc;
 use gtk4::prelude::{ApplicationExt, ActionMapExt, ApplicationExtManual, EditableExtManual, DrawingAreaExtManual};
 use gtk4::traits::{GtkApplicationExt, GtkWindowExt, EditableExt, WidgetExt, BoxExt};
 use rex::parser::macros::CommandCollection;
+use rex::parser::parse_with_custom_commands;
+use rex::Renderer;
 use serde_json;
 
 use cairo::glib::VariantDict;
@@ -24,23 +28,24 @@ use gtk4::{Application, ApplicationWindow};
 use rex::font::backend::ttf_parser::TtfMathFont;
 
 use error::AppResult;
-use undo_stack::{UndoStack, get_selection};
-use render::{render_layout, layout_and_size, draw_formula, MetaInfo};
+use undo::{UndoStack, get_selection};
+use render::{draw_formula, MetaInfo};
 use geometry::Metrics;
 
+use crate::error::AppError;
+use crate::geometry::BBox;
+use crate::glyph_to_character::collect_chars;
 
-// const EXAMPLE_FORMULA : &str = r"\iint \sqrt{1 + f^2(x,t,t)}\,\mathrm{d}x\mathrm{d}y\mathrm{d}t = \sum \xi(t)";
+
 const EXAMPLE_FORMULA : &str = r"\left.x^{x^{x^x_x}_{x^x_x}}_{x^{x^x_x}_{x^x_x}}\right\} \mathrm{wat?}";
 
-const SVG_PATH : &str = "example.svg";
 const UI_FONT_SIZE : f64 = 10.0;
-// const DEFAULT_FONT : &[u8] = include_bytes!("../resources/rex-xits.otf");
 const DEFAULT_FONT : &[u8] = include_bytes!("../resources/LibertinusMath-Regular.otf");
 
 
 #[derive(Debug, Clone, Copy)]
 enum Format {
-    Svg, 
+    Svg { glyph_as_text : bool }, 
     Tex,
 }
 
@@ -113,7 +118,7 @@ fn main() {
     application.connect_handle_local_options(clone!(
             @strong app_context, 
             => move |_application, option| {
-        let AppContext { math_font, format, font_size, outfile, informula, metainfo, custom_cmd } = &app_context;
+        let AppContext {math_font,format,font_size,outfile,informula,metainfo,custom_cmd, } = &app_context;
         match parse_path(option) {
             Ok(Some(font_file)) => math_font.set(font_file),
             Err(e) => {
@@ -223,6 +228,15 @@ fn setup_command_line(application: &Application) {
     );
 
     application.add_main_option(
+        "glyphastext", 
+        gtk::glib::Char(b't' as i8), 
+        gtk::glib::OptionFlags::IN_MAIN,
+        gtk::glib::OptionArg::None, 
+        "For SVG outputs, renders glyphs as '<text>' where possible (the default is to render them as curves and lines), deferring the job of rendering the glyph to the SVG viewer. This may result in crispier renders on some platforms and software, e.g. because these platforms use subpixel antialiasing, but it also makes the resulting file dependent on the font being installed on the platform.", 
+        None,
+    );
+
+    application.add_main_option(
         "format",
         gtk4::glib::Char(b'f' as i8),
         gtk4::glib::OptionFlags::IN_MAIN, 
@@ -269,7 +283,7 @@ fn parse_format(option : &VariantDict) -> Option<Format> {
     let outfile = option.lookup_value("format", None)?;
     let format_string = outfile.try_get::<String>().ok()?;
     match format_string.as_str() {
-        "svg" => Some(Format::Svg),
+        "svg" => Some(Format::Svg { glyph_as_text: option.lookup_value("glyphastext", None).is_some() }),
         "tex" => Some(Format::Tex),
         _     => None,
     } 
@@ -347,14 +361,14 @@ fn build_ui(app : &Application, font : TtfMathFont<'static>, app_context : AppCo
     let undo_stack = Rc::new(RefCell::new(UndoStack::new()));
 
 
-    let save_svg_action = SimpleAction::new("save-svg", None);
-    // let button = Button::with_label("Save to SVG");
-    save_svg_action.connect_activate(clone!(@strong text_field, @strong font, @strong custom_cmd => move |_, _| {
-        let text = text_field.text();
-        // TODO : error handling
-        let result = save_svg(&Output::Path(PathBuf::from(SVG_PATH)), text.as_str(), font.clone(), font_size, custom_cmd.borrow().deref());
-        result.unwrap();
-    }));
+    // let save_svg_action = SimpleAction::new("save-svg", None);
+    // // let button = Button::with_label("Save to SVG");
+    // save_svg_action.connect_activate(clone!(@strong text_field, @strong font, @strong custom_cmd, => move |_, _| {
+    //     let text = text_field.text();
+    //     // TODO : error handling
+    //     let result = save_svg(&Output::Path(PathBuf::from(SVG_PATH)), text.as_str(), font.clone(), font_size, custom_cmd.borrow().deref(), false);
+    //     result.unwrap();
+    // }));
 
     let undo_action = SimpleAction::new("undo", None);
     let redo_action = SimpleAction::new("redo", None);
@@ -458,8 +472,8 @@ fn save_to_output(text: &str, outfile: &Output, format : Format, font : Rc<TtfMa
     eprintln!("Saving to {:?}", outfile);
 
     match format {
-        Format::Svg => {
-            let metrics = save_svg(outfile, &text, font, font_size, custom_cmd)?;
+        Format::Svg { glyph_as_text: textastext } => {
+            let metrics = save_svg(outfile, &text, font, font_size, custom_cmd, textastext)?;
             if print_metainfo {
                 let metainfo = MetaInfo { metrics, formula: text.to_string() };
                 let json = serde_json::to_string(&metainfo);
@@ -475,33 +489,87 @@ fn save_to_output(text: &str, outfile: &Output, format : Format, font : Rc<TtfMa
 }
 
 fn save_tex(outfile: &Output, text: &str) -> AppResult<()> {
-    if let Output::Path(outfile_path) = outfile {
-        let result = std::fs::write(outfile_path, text)?;
-        Ok(result)
-    }
-    else {
-        println!("{}", text);
-        Ok(())
-    }
+    outfile.stream()?.write(text.as_bytes())?;
+    Ok(())
 }
 
 
-fn save_svg(path : &Output, formula : &str, font : Rc<TtfMathFont>, font_size : f64, custom_cmd : &CommandCollection) -> AppResult<Metrics> {
-    let (layout, formula_metrics) = layout_and_size(font.as_ref(), font_size, formula, custom_cmd,)?;
-
+fn save_svg(path : &Output, formula : &str, font : Rc<TtfMathFont>, font_size : f64, custom_cmd : &CommandCollection, glyph_as_text : bool) -> AppResult<Metrics> {
     eprintln!("Saving to SVG!");
-    let formula_bbox = &formula_metrics.bbox;
+    let font_ref = font.as_ref();
+    let nodes = parse_with_custom_commands(formula, custom_cmd).map_err(|e| AppError::ParseError(format!("{}", e)))?;
+
+
+
+    let font_context = FontContext::new(font_ref);
+    let layout_settings = rex::layout::LayoutSettings::new(&font_context).font_size(font_size);
+    let layout = layout(&nodes, layout_settings)?;
+
+
+    // Create metrics
+    let layout_size = layout.size();
+    let formula_bbox = BBox::from_typographic(0., layout_size.depth, layout_size.width, layout_size.height,);
+    let formula_metrics = Metrics {
+        bbox: formula_bbox,
+        baseline: layout_size.depth,
+        font_size,
+    };
+
+    let x = formula_bbox.x_min;
+    let y = formula_bbox.y_min;
     let width  = formula_bbox.width();
     let height = formula_bbox.height();
-    let svg_surface = gtk4::cairo::SvgSurface::for_stream(width, height, path.stream()?)?;
-    let context = Context::new(svg_surface)?;
-    // In Cairo SVG, we aren't at a liberty to specify the view box, only height and width
-    // So we must translate so that the minimum y is 0
-    context.translate(0., - formula_bbox.y_min);
+    
 
-    render_layout(&context, None, &formula_metrics, layout)?;
+
+
+    // For text-as-text rendering, we need to construct the glyph to char oracle
+
+
+    // render_layout(&context, None, &formula_metrics, layout)?;
+    let mut svg = rex_svg::SvgContext::new();
+    if glyph_as_text {
+        let mut char_set = HashSet::new();
+        for node in nodes {
+            collect_chars(&node, &mut char_set);
+        }
+        let glyph_to_char_table : HashMap<GlyphId, char> = 
+            char_set
+            .into_iter()
+            .map(|character| font.font().glyph_index(character).map(|glyph_id| (GlyphId::from(glyph_id), character)))
+            .flatten()
+            .collect()
+        ;
+        let font_name = find_font_family_name(font.as_ref());
+        if let Some(font_name) = font_name {
+            svg.glyph_as_text(glyph_to_char_table, &font_name);
+        }
+    }
+
+    let renderer = Renderer::new();
+    renderer.render(&layout, &mut svg);
+
+    path.stream()?.write(svg.finalize(x, y, width, height).as_bytes())?;
+
     Ok(formula_metrics)
 
+}
+
+fn find_font_family_name<'a>(font: & 'a TtfMathFont) -> Option<String> {
+    let table = font.font().tables().name?.names;
+
+    for name in table {
+        // Cf https://learn.microsoft.com/en-us/typography/opentype/spec/name for meaning of id's
+        // This gets font-family name
+        // TODO take into account language & platform ID 
+        if name.name_id == 1 {
+            if let Ok(to_return) = utf16string::WStr::from_utf16be(name.name) {
+                return Some(to_return.to_utf8());
+            }
+        }
+    }
+
+    None
 }
 
 
