@@ -8,7 +8,7 @@ ttf-parser  = ["dep:ttf-parser", "rex/ttfparser-fontparser"]
 
 
 [dependencies]
-rex = {git = "https://github.com/KenyC/ReX", features = [], default-features = false}
+rex = {git = "https://github.com/KenyC/ReX", features = [], default-features = false, rev="30ad53b09336db84d0cd07fab051465c72d88685"}
 
 
 [dependencies.ttf-parser]

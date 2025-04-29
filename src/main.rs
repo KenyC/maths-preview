@@ -13,13 +13,15 @@ use std::rc::Rc;
 
 use gtk4::prelude::{ApplicationExt, ActionMapExt, ApplicationExtManual, EditableExtManual, DrawingAreaExtManual};
 use gtk4::traits::{GtkApplicationExt, GtkWindowExt, EditableExt, WidgetExt, BoxExt};
+use rex::font::common::GlyphId;
+use rex::font::FontContext;
+use rex::layout::engine::layout;
 use rex::parser::macros::CommandCollection;
 use rex::parser::parse_with_custom_commands;
 use rex::Renderer;
 use serde_json;
 
 use cairo::glib::VariantDict;
-use gtk4::cairo::Context;
 use gtk4::gio::SimpleAction;
 use gtk4::glib::clone;
 use gtk4::{DrawingArea, glib, Statusbar, Entry};
@@ -229,9 +231,9 @@ fn setup_command_line(application: &Application) {
 
     application.add_main_option(
         "glyphastext", 
-        gtk::glib::Char(b't' as i8), 
-        gtk::glib::OptionFlags::IN_MAIN,
-        gtk::glib::OptionArg::None, 
+        gtk4::glib::Char(b't' as i8), 
+        gtk4::glib::OptionFlags::IN_MAIN,
+        gtk4::glib::OptionArg::None, 
         "For SVG outputs, renders glyphs as '<text>' where possible (the default is to render them as curves and lines), deferring the job of rendering the glyph to the SVG viewer. This may result in crispier renders on some platforms and software, e.g. because these platforms use subpixel antialiasing, but it also makes the resulting file dependent on the font being installed on the platform.", 
         None,
     );
