@@ -18,6 +18,8 @@ import tempfile
 import os
 import uuid
 import logging
+
+import settings_rw
 from utils import *
 
 # # For debug purposes
@@ -46,6 +48,10 @@ def insert_inline_formula(*args):
 
 def insert_formula(block):
 	settings = get_apso_settings()
+	if settings is None:
+		msg_box("Couldn't load settings")
+		return
+
 	# create temporary file path
 	path = os.path.join(tempfile.gettempdir(), FORMULA_FILE)
 
@@ -78,7 +84,15 @@ def insert_formula(block):
 	# LAUNCH PROGRAM
 	#######################################
 	
-	metainfo = launch_maths_preview(settings["MathsPreviewPath"], char_height, path, maths_font = settings.get("MathsFont"), initial_formula = initial_formula, custom_cmd_file = settings.get("CustomCommandFile"))
+	metainfo = launch_maths_preview(
+		settings["MathsPreviewPath"], 
+		char_height, 
+		path, 
+		maths_font = settings.get("MathsFont"), 
+		initial_formula = initial_formula, 
+		custom_cmd_file = settings.get("CustomCommandFile"),
+		text_as_text = settings.get("TextAsText")
+	)
 	if metainfo is None:
 		return
 	width_px  = metainfo["metrics"]["bbox"]["x_max"] - metainfo["metrics"]["bbox"]["x_min"] 
@@ -115,7 +129,7 @@ def insert_formula(block):
 
 
 
-def launch_maths_preview(exe_path, char_height, path, maths_font = None, initial_formula = None, custom_cmd_file = None):
+def launch_maths_preview(exe_path, char_height, path, maths_font = None, initial_formula = None, custom_cmd_file = None, text_as_text = None):
 	additional_args = []
 	if maths_font is not None:
 		additional_args.extend(["-m", maths_font,])
@@ -126,10 +140,13 @@ def launch_maths_preview(exe_path, char_height, path, maths_font = None, initial
 	if initial_formula is not None:
 		additional_args.extend(["-i", initial_formula,])
 
+	if text_as_text is not None and text_as_text:
+		additional_args.extend(["-t"])
+
 	# Start program
 	try:
 		cmd = [
-			exe_path, 
+			os.path.expanduser(exe_path), 
 			"-s", str(char_height),
 			"-f", "svg", 
 			"-d", 
@@ -243,24 +260,5 @@ def msg_box(text):
 
 
 def get_apso_settings():
-    key = "/InsertFromMathsPreview.Settings"
-    reader = getConfigurationAccess(key)
-    groupnames = reader.ElementNames
-    settings = {}
-    for groupname in groupnames:
-        group = reader.getByName(groupname)
-        props = group.ElementNames
-        values = group.getPropertyValues(props)
-        settings.update({k: v for k, v in zip(props, values)})
-
-    default_settings = {
-    	"MathsPreviewPath"  : "~/bin/maths_preview",
-    	"MathsFont"         : None,
-    	"CustomCommandFile" : None,
-    }
-
-    for k, v in settings.items():
-    	if v is None or v.strip() == "":
-    		settings[k] = default_settings[k]
-
-    return settings
+	key = "/InsertFromMathsPreview.Settings/AllOptions"
+	return settings_rw.read_settings(key)

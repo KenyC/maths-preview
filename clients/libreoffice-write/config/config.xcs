@@ -19,6 +19,11 @@ xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XM
                     <desc>Path to list of custom command definition (leave blank if not using custom command).</desc>
                 </info>
             </prop>
+            <prop oor:name="TextAsText" oor:type="xs:boolean">
+                <info>
+                    <desc>If true, renders glyphs as &lt;text&gt;. This requires that the font used for math be installed on the system, results in slightly crispier renders. If false, renders them as path, making it portable.</desc>
+                </info>
+            </prop>
         </group>
     </component>
 </oor:component-schema>
