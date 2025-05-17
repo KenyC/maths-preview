@@ -1,7 +1,7 @@
 use std::rc::Rc;
 
 use cairo::Context;
-use rex::{font::{backend::ttf_parser::TtfMathFont, FontContext, MathFont}, layout::engine::layout, parser::{macros::CommandCollection, parse_with_custom_commands}, Renderer};
+use rex::{font::{backend::ttf_parser::TtfMathFont, MathFont}, layout::engine::{LayoutBuilder}, parser::{macros::CommandCollection, parse_with_custom_commands}, Renderer};
 use serde::Serialize;
 
 use crate::{geometry::{Metrics, BBox}, error::{AppResult, AppError}};
@@ -56,9 +56,12 @@ pub fn layout_and_size<'f, T : MathFont>(font: &'f T, font_size : f64, formula: 
     let parse_node = parse_with_custom_commands(formula, custom_cmd).map_err(|e| AppError::ParseError(format!("{}", e)))?;
 
     // Create node
-    let font_context = FontContext::new(font);
-    let layout_settings = rex::layout::LayoutSettings::new(&font_context).font_size(font_size);
-    let layout = layout(&parse_node, layout_settings)?;
+    let layout = 
+        LayoutBuilder::new(font)
+        .font_size(font_size)
+        .build()
+        .layout(&parse_node)?
+    ;
 
     let formula_bbox = layout.size();
 

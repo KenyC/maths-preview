@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use rex::parser::{nodes::{Accent, Array, AtomChange, ColSeparator, ExtendedDelimiter, GenFraction, PlainText, Radical, Scripts, Stack}, symbols::Symbol, ParseNode};
+use rex::parser::{nodes::{Accent, Array, AtomChange, ColSeparator, ExtendedDelimiter, FontEffect, GenFraction, PlainText, Radical, Scripts, Stack}, symbols::Symbol, ParseNode};
 
 
 
@@ -72,6 +72,9 @@ pub(crate) fn collect_chars(node : &ParseNode, characters : &mut HashSet<char>) 
         ParseNode::Stack(Stack { lines, .. }) 
         => {
             lines.iter().flatten().for_each(|node| collect_chars(node, characters));
+        },
+        ParseNode::FontEffect(FontEffect { inner }) => {
+            inner.iter().for_each(|node| collect_chars(node, characters));
         },
         ParseNode::Array(Array { col_format, rows, left_delimiter, right_delimiter, .. }) 
         => {

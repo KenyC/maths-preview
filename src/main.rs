@@ -12,12 +12,11 @@ use std::io::Write;
 use std::rc::Rc;
 
 
-use gtk4::prelude::{ApplicationExt, ActionMapExt, ApplicationExtManual, EditableExtManual, DrawingAreaExtManual};
-use gtk4::traits::{GtkApplicationExt, GtkWindowExt, EditableExt, WidgetExt, BoxExt};
+use gtk4::prelude::{ApplicationExt, ActionMapExt, ApplicationExtManual};
+use gtk4::traits::{GtkApplicationExt, GtkWindowExt};
 use rex::font::common::GlyphId;
-use rex::font::FontContext;
 use rex::font::backend::ttf_parser::TtfMathFont;
-use rex::layout::engine::layout;
+use rex::layout::engine::LayoutBuilder;
 use rex::parser::macros::CommandCollection;
 use rex::parser::parse_with_custom_commands;
 use rex::Renderer;
@@ -25,8 +24,8 @@ use serde_json;
 
 use gtk4::gio::SimpleAction;
 use gtk4::glib::clone;
-use gtk4::{DrawingArea, glib, Statusbar, Entry};
-use gtk4::{Application, ApplicationWindow};
+use gtk4::glib;
+use gtk4::Application;
 
 
 
@@ -150,9 +149,12 @@ fn save_svg(path : &Output, formula : &str, font : Rc<TtfMathFont>, font_size : 
 
 
 
-    let font_context = FontContext::new(font_ref);
-    let layout_settings = rex::layout::LayoutSettings::new(&font_context).font_size(font_size);
-    let layout = layout(&nodes, layout_settings)?;
+    let layout_engine = 
+        LayoutBuilder::new(font_ref)
+        .font_size(font_size)
+        .build()
+    ;
+    let layout = layout_engine.layout(&nodes)?;
 
 
     // Create metrics

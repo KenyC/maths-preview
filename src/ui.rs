@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::ops::Deref;
 use std::rc::Rc;
 
-use gtk4::prelude::{ApplicationExt, ActionMapExt, ApplicationExtManual, EditableExtManual, DrawingAreaExtManual};
+use gtk4::prelude::{ActionMapExt, EditableExtManual, DrawingAreaExtManual};
 use gtk4::traits::{GtkApplicationExt, GtkWindowExt, EditableExt, WidgetExt, BoxExt};
 use gtk4::gio::SimpleAction;
 use gtk4::glib::clone;
@@ -44,7 +44,7 @@ pub fn build_ui(app : &Application, font : TtfMathFont<'static>, app_context : A
     setup_undo_actions(app, undo_stack.clone(), text_field.clone());
     let last_ok_string = Rc::new(RefCell::new(EXAMPLE_FORMULA.to_string()));
 
-    draw_area.set_draw_func(clone!(@strong font, @strong text_field, @strong last_ok_string, @strong status_bar, @strong custom_cmd => move |area, context, width, height| {
+    draw_area.set_draw_func(clone!(@strong font, @strong text_field, @strong last_ok_string, @strong status_bar, @strong custom_cmd => move |_area, context, width, height| {
         let text = text_field.text();
         context.set_source_rgb(0.0, 0.0, 0.0);
 
