@@ -3,7 +3,7 @@ use std::ops::Deref;
 use std::rc::Rc;
 
 use gtk4::prelude::{ActionMapExt, EditableExtManual, DrawingAreaExtManual};
-use gtk4::traits::{GtkApplicationExt, GtkWindowExt, EditableExt, WidgetExt, BoxExt};
+use gtk4::prelude::{GtkApplicationExt, GtkWindowExt, EditableExt, WidgetExt, BoxExt};
 use gtk4::gio::SimpleAction;
 use gtk4::glib::clone;
 use gtk4::{DrawingArea, glib, Statusbar, Entry};
@@ -44,7 +44,7 @@ pub fn build_ui(app : &Application, font : TtfMathFont<'static>, app_context : A
     setup_undo_actions(app, undo_stack.clone(), text_field.clone());
     let last_ok_string = Rc::new(RefCell::new(EXAMPLE_FORMULA.to_string()));
 
-    draw_area.set_draw_func(clone!(@strong font, @strong text_field, @strong last_ok_string, @strong status_bar, @strong custom_cmd => move |_area, context, width, height| {
+    draw_area.set_draw_func(clone!(#[strong] font, #[strong] text_field, #[strong] last_ok_string, #[strong] status_bar, #[strong] custom_cmd, move |_area, context, width, height| {
         let text = text_field.text();
         context.set_source_rgb(0.0, 0.0, 0.0);
 
@@ -71,21 +71,21 @@ pub fn build_ui(app : &Application, font : TtfMathFont<'static>, app_context : A
     }));
 
 
-    text_field.connect_changed(clone!(@weak draw_area => move |_text_buffer| {
+    text_field.connect_changed(clone!(#[weak] draw_area, move |_text_buffer| {
         draw_area.queue_draw()
     }));
-    text_field.delegate().unwrap().connect_insert_text(clone!(@strong undo_stack => move |entry, text, pt| {
+    text_field.delegate().unwrap().connect_insert_text(clone!(#[strong] undo_stack, move |entry, text, pt| {
         let selection = get_selection(entry);
         undo_stack.borrow_mut().insert_text(text, *pt, selection);
     }));
-    text_field.delegate().unwrap().connect_delete_text(clone!(@strong undo_stack => move |entry, start_pos, end_pos| {
+    text_field.delegate().unwrap().connect_delete_text(clone!(#[strong] undo_stack, move |entry, start_pos, end_pos| {
         let deleted_text = entry.chars(start_pos, end_pos);
         let selection = get_selection(entry);
         undo_stack.borrow_mut().delete_text(deleted_text.as_str(), start_pos, end_pos, selection);
     }));
 
 
-    window.connect_close_request(clone!(@strong text_field, @strong outfile, @strong font, @strong custom_cmd => move |_| {
+    window.connect_close_request(clone!(#[strong] text_field, #[strong] outfile, #[strong] font, #[strong] custom_cmd, move |_| {
         let text = text_field.text();
         // TODO: error handling
         // Can't really see how to set an exit status code once the app is running
@@ -163,11 +163,11 @@ fn setup_undo_actions(app: &Application, undo_stack : Rc<RefCell<UndoStack>>, te
     app.set_accels_for_action("app.redo", &["<Ctrl><Shift>Z"]);
 
 
-    undo_action.connect_activate(clone!(@strong text_field, @strong undo_stack => move |_, _| {
+    undo_action.connect_activate(clone!(#[strong] text_field, #[strong] undo_stack, move |_, _| {
         undo_stack.borrow_mut().undo(text_field.clone());
     }));
 
-    redo_action.connect_activate(clone!(@strong text_field, @strong undo_stack => move |_, _| {
+    redo_action.connect_activate(clone!(#[strong] text_field, #[strong] undo_stack, move |_, _| {
         undo_stack.borrow_mut().redo(text_field.clone());
     }));
 }

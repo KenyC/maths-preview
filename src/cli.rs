@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 use rex::parser::macros::CommandCollection;
 
-use cairo::glib::VariantDict;
+use gtk4::glib::VariantDict;
 use gtk4::prelude::*;
 use gtk4::Application;
 
@@ -191,7 +191,7 @@ fn parse_metainfo(option : &VariantDict) -> bool {
     option.lookup_value("metainfo", None).is_some()
 }
 
-pub fn handle_options(app_context : &AppContext, option : &VariantDict) -> i32 {
+pub fn handle_options(app_context : &AppContext, option : &VariantDict) -> std::ops::ControlFlow<gtk4::glib::ExitCode> {
 	let AppContext {math_font,format,font_size,outfile,informula,metainfo,custom_cmd, } = app_context;
 	match parse_path(option) {
 	    Ok(Some(font_file)) => math_font.set(font_file),
@@ -228,5 +228,5 @@ pub fn handle_options(app_context : &AppContext, option : &VariantDict) -> i32 {
 	if parse_metainfo(option) {
 	    metainfo.set(true);
 	} 
-	-1
+	std::ops::ControlFlow::Continue(())
 }

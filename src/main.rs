@@ -13,7 +13,7 @@ use std::rc::Rc;
 
 
 use gtk4::prelude::{ApplicationExt, ActionMapExt, ApplicationExtManual};
-use gtk4::traits::{GtkApplicationExt, GtkWindowExt};
+use gtk4::prelude::{GtkApplicationExt, GtkWindowExt};
 use rex::font::common::GlyphId;
 use rex::font::backend::ttf_parser::TtfMathFont;
 use rex::layout::engine::LayoutBuilder;
@@ -85,11 +85,11 @@ fn main() {
 
 
     application.connect_handle_local_options(clone!(
-            @strong app_context, 
-            => move |_application, option| {
+            #[strong] app_context, 
+            move |_application, option| {
                 cli::handle_options(&app_context, option)
     }));
-    application.connect_activate(clone!(@strong app_context => move |app| 
+    application.connect_activate(clone!(#[strong] app_context, move |app| 
         match load_font(app_context.math_font.get()) {
             Ok(font) => build_ui(app, font, app_context.clone()),
             Err(e)   => {
@@ -102,7 +102,7 @@ fn main() {
 
 
     let action_close = SimpleAction::new("quit", None);
-    action_close.connect_activate(clone!(@weak application => move |_, _| {
+    action_close.connect_activate(clone!(#[weak] application, move |_, _| {
         application.windows()[0].close();
         // application.quit(); <- QUIT does not call delete window
     }));
