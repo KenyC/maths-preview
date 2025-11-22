@@ -88,7 +88,7 @@ impl<T : GivesOutline> FontBackend<T> for SvgContext {
         let mut path_string = None;
         if let Some(TextAsText { glyph_to_char_table, font_name }) = &self.glyph_as_text {
             if let Some(character) = glyph_to_char_table.get(&gid) {
-                path_string = Some(render_symbol_as_text(pos, scale, *character, &font_name));
+                path_string = Some(render_symbol_as_text(pos, scale, *character, &font_name, self.current_color()));
             }
         }
 
@@ -97,13 +97,14 @@ impl<T : GivesOutline> FontBackend<T> for SvgContext {
     }
 }
 
-fn render_symbol_as_text(pos: Cursor, scale: f64, character: char, font_name: &str) -> String {
-    format!(r#"<text x="{}" y="{}" font-family="{}" font-size="{}px">&#x{:X};</text>"#, 
+fn render_symbol_as_text(pos: Cursor, scale: f64, character: char, font_name: &str, color: rex::RGBA) -> String {
+    format!(r#"<text x="{}" y="{}" font-family="{}" font-size="{}px" {}>&#x{:X};</text>"#, 
         pos.x,
         pos.y,
         font_name,
         scale,
-        character as u32
+        to_xml_color(color),
+        character as u32,
     )
 }
 
