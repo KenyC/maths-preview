@@ -4,8 +4,6 @@ use std::io::Write;
 use std::rc::Rc;
 
 
-use gtk4::prelude::{ApplicationExt, ActionMapExt, ApplicationExtManual};
-use gtk4::prelude::{GtkApplicationExt, GtkWindowExt};
 use rex::font::common::GlyphId;
 use rex::font::backend::ttf_parser::TtfMathFont;
 use rex::layout::engine::LayoutBuilder;
@@ -14,15 +12,10 @@ use rex::parser::parse_with_custom_commands;
 use rex::Renderer;
 use serde_json;
 
-use gtk4::gio::SimpleAction;
-use gtk4::glib::clone;
-use gtk4::glib;
-use gtk4::Application;
 
 
 
 use crate::error::AppResult;
-use crate::ui::build_ui;
 use crate::cli::{Format, Output, DEFAULT_FONT, EXAMPLE_FORMULA, UI_FONT_SIZE};
 use crate::render::MetaInfo;
 use crate::geometry::Metrics;
@@ -166,8 +159,4 @@ fn find_font_family_name<'a>(font: & 'a TtfMathFont) -> Option<String> {
 
 
 
-fn load_font<'a>(file : &'a [u8]) -> AppResult<TtfMathFont<'a>> {
-    let font = ttf_parser::Face::parse(file, 0)?;
-    Ok(TtfMathFont::new(font)?)
-}
 

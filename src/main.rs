@@ -3,11 +3,6 @@
 use gtk4::prelude::{ApplicationExt, ActionMapExt, ApplicationExtManual};
 use gtk4::prelude::{GtkApplicationExt, GtkWindowExt};
 use rex::font::backend::ttf_parser::TtfMathFont;
-use rex::layout::engine::LayoutBuilder;
-use rex::parser::macros::CommandCollection;
-use rex::parser::parse_with_custom_commands;
-use rex::Renderer;
-use serde_json;
 
 use gtk4::gio::SimpleAction;
 use gtk4::glib::clone;
@@ -19,12 +14,7 @@ use gtk4::Application;
 use maths_preview::error::AppResult;
 use maths_preview::ui::build_ui;
 use maths_preview::app::AppContext;
-use maths_preview::cli::{Format, Output, DEFAULT_FONT, EXAMPLE_FORMULA, UI_FONT_SIZE};
 use maths_preview::cli;
-use maths_preview::render::MetaInfo;
-use maths_preview::geometry::Metrics;
-use maths_preview::error::AppError;
-use maths_preview::geometry::BBox;
 
 
 
