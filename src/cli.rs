@@ -10,7 +10,7 @@ use gtk4::Application;
 
 
 use crate::error::AppResult;
-use crate::AppContext;
+use crate::app::AppContext;
 
 
 pub const EXAMPLE_FORMULA : &str = r"\left.x^{x^{x^x_x}_{x^x_x}}_{x^{x^x_x}_{x^x_x}}\right\} \mathrm{wat?}";

@@ -16,7 +16,7 @@ use crate::render::draw_formula;
 use crate::undo::{UndoStack, get_selection};
 
 
-use crate::{save_to_output, AppContext};
+use crate::app::{save_to_output, AppContext};
 
 
 struct Ui {
