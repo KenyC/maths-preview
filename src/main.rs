@@ -11,10 +11,10 @@ use gtk4::Application;
 
 
 
-use maths_preview::error::AppResult;
-use maths_preview::ui::build_ui;
-use maths_preview::app::AppContext;
-use maths_preview::cli;
+use maths_preview::desktop::error::AppResult;
+use maths_preview::desktop::ui::build_ui;
+use maths_preview::desktop::app::AppContext;
+use maths_preview::desktop::cli;
 
 
 

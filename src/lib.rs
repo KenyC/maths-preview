@@ -1,8 +1,4 @@
-pub mod app;
-pub mod cli;
-pub mod error;
 pub mod geometry;
 pub mod glyph_to_character;
-pub mod render;
-pub mod ui;
-pub mod undo;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod desktop;

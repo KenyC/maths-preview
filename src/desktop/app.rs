@@ -15,11 +15,11 @@ use serde_json;
 
 
 
-use crate::error::AppResult;
-use crate::cli::{Format, Output, DEFAULT_FONT, EXAMPLE_FORMULA, UI_FONT_SIZE};
-use crate::render::MetaInfo;
+use crate::desktop::error::AppResult;
+use crate::desktop::cli::{Format, Output, DEFAULT_FONT, EXAMPLE_FORMULA, UI_FONT_SIZE};
+use crate::desktop::render::MetaInfo;
 use crate::geometry::Metrics;
-use crate::error::AppError;
+use crate::desktop::error::AppError;
 use crate::geometry::BBox;
 use crate::glyph_to_character::collect_chars;
 

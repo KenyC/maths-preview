@@ -9,13 +9,13 @@ use gtk4::Application;
 
 
 
-use crate::error::AppResult;
-use crate::app::AppContext;
+use crate::desktop::error::AppResult;
+use crate::desktop::app::AppContext;
 
 
 pub const EXAMPLE_FORMULA : &str = r"\left.x^{x^{x^x_x}_{x^x_x}}_{x^{x^x_x}_{x^x_x}}\right\} \mathrm{wat?}";
 pub const UI_FONT_SIZE : f64 = 10.0;
-pub const DEFAULT_FONT : &[u8] = include_bytes!("../resources/LibertinusMath-Regular.otf");
+pub const DEFAULT_FONT : &[u8] = include_bytes!("../../resources/LibertinusMath-Regular.otf");
 
 
 #[derive(Debug, Clone, Copy)]
