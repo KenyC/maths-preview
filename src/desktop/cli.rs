@@ -13,13 +13,13 @@ use crate::error::AppResult;
 use crate::desktop::app::AppContext;
 
 
-pub const EXAMPLE_FORMULA : &str = r"\left.x^{x^{x^x_x}_{x^x_x}}_{x^{x^x_x}_{x^x_x}}\right\} \mathrm{wat?}";
-pub const UI_FONT_SIZE : f64 = 10.0;
-pub const DEFAULT_FONT : &[u8] = include_bytes!("../../resources/LibertinusMath-Regular.otf");
+pub(crate) const EXAMPLE_FORMULA : &str = r"\left.x^{x^{x^x_x}_{x^x_x}}_{x^{x^x_x}_{x^x_x}}\right\} \mathrm{wat?}";
+pub(crate) const UI_FONT_SIZE : f64 = 10.0;
+pub(crate) const DEFAULT_FONT : &[u8] = include_bytes!("../../resources/LibertinusMath-Regular.otf");
 
 
 #[derive(Debug, Clone, Copy)]
-pub enum Format {
+pub(crate) enum Format {
     Svg { glyph_as_text : bool }, 
     Tex,
 }
@@ -33,7 +33,7 @@ impl Default for Format {
 
 
 #[derive(Debug,)]
-pub enum Output {
+pub(crate) enum Output {
     Stdout,
     Path(PathBuf),
 }

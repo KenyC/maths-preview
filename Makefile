@@ -1,5 +1,7 @@
 WASM_TARGET_DIR?=target/
 
+all: desktop web
+
 desktop:
 	cargo build
 

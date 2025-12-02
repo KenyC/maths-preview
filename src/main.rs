@@ -37,7 +37,6 @@ mod desktop {
         cli::setup_command_line(&application);
 
 
-
         application.connect_handle_local_options(clone!(
                 #[strong] app_context, 
                 move |_application, option| {
