@@ -3,16 +3,26 @@ name = "maths_preview"
 version = "0.1.0"
 edition = "2021"
 
+
+[lib]
+# We keep "cdylib" for wasm, and cargo will add "rlib" for the binary
+crate-type = ["cdylib", "rlib"]
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [[bin]]
 name = "maths_preview"
 path = "src/main.rs"
 
-[dependencies]
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 gtk4 = "0.10.2"
 cairo-rs = {version = "*", features=["svg"]}
 rex = {git = "https://github.com/KenyC/ReX", features = ["ttfparser-fontparser", "cairo-renderer"], rev = "37a0b47177f24f124513894ed11b0faa328716b8"}
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+rex = {git = "https://github.com/KenyC/ReX", features = [], rev = "37a0b47177f24f124513894ed11b0faa328716b8"}
+
+[dependencies]
 ttf-parser = "*"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
