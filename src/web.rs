@@ -6,6 +6,7 @@ mod owned_math_font;
 use canvas::{CanvasContext, OffscreenCanvasContext};
 use owned_math_font::TtfMathFont;
 use rex::{parser::parse, layout::engine::LayoutBuilder, Renderer};
+use rex::parser::macros::CommandCollection;
 use web_sys::{CanvasRenderingContext2d, OffscreenCanvasRenderingContext2d,};
 use wasm_bindgen::prelude::*;
 use owned_ttf_parser::{OwnedFace, AsFaceRef};
@@ -13,7 +14,7 @@ use crate::error::{AppError, AppResult};
 
 use crate::geometry::{BBox, Metrics};
 use crate::svg::SvgContext;
-use crate::render::scale_and_center;
+use crate::render::{scale_and_center, layout_and_size, render_layout};
 
 // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global
 // allocator.
@@ -74,7 +75,7 @@ fn render_formula_to_offscreen_canvas(
     let font = context.as_ref();
     let math_font  = TtfMathFont::new(font.as_face_ref()).unwrap();
 
-    let (layout, formula_metrics) = layout_and_size(&math_font, PNG_FONT_SIZE, formula,)?;
+    let (layout, formula_metrics) = layout_and_size(&math_font, PNG_FONT_SIZE, formula, &CommandCollection::default())?;
 
     let width  = formula_metrics.bbox.width();
     let height = formula_metrics.bbox.height();
@@ -115,7 +116,7 @@ pub fn render_formula_to_svg(
     let font = context.as_ref();
     let math_font  = TtfMathFont::new(font.as_face_ref()).unwrap();
 
-    let (layout, formula_metrics) = layout_and_size(&math_font, FONT_SIZE, formula,).unwrap();
+    let (layout, formula_metrics) = layout_and_size(&math_font, FONT_SIZE, formula, &CommandCollection::default()).unwrap();
     let mut svg_context = SvgContext::new();
     let renderer = Renderer::new();
 
@@ -140,7 +141,7 @@ fn render_formula_to_canvas(
     let mut context = CanvasContext(canvas);
     let canvas_size = get_canvas_size(context);
     context.0.clear_rect(0., 0., canvas_size.0, canvas_size.1);
-    let (layout, formula_metrics) = layout_and_size(&math_font, FONT_SIZE, formula,)?;
+    let (layout, formula_metrics) = layout_and_size(&math_font, FONT_SIZE, formula, &CommandCollection::default())?;
     render_layout(&mut context, Some(canvas_size), &formula_metrics, layout);
     Ok(())
 }
@@ -153,49 +154,9 @@ fn get_canvas_size(context: CanvasContext) -> (f64, f64) {
 }
 
 
-fn layout_and_size<'a, 'f, 'b>(font: &'f TtfMathFont<'a, 'b>, font_size : f64, formula: &str) -> AppResult<(rex::layout::Layout<'f, TtfMathFont<'a, 'b>>, Metrics)> {
-    let parse_node = parse(formula).map_err(|e| AppError::ParseError(format!("{}", e)))?;
-
-    // Create node
-    let layout = 
-        LayoutBuilder::new(font)
-        .font_size(font_size)
-        .build()
-        .layout(&parse_node)?
-    ;
-
-    let formula_bbox = layout.size();
-
-    // Create metrics
-    let metrics = Metrics {
-        font_size,
-        bbox: BBox::from_typographic(0., formula_bbox.depth, formula_bbox.width, formula_bbox.height,),
-        baseline: formula_bbox.depth,
-    };
-
-    Ok((layout, metrics))
-}
 
 
-fn render_layout(
-    context: &mut CanvasContext, 
-    canvas_size: Option<(f64, f64)>, 
-    formula_metrics: &Metrics, 
-    layout: rex::layout::Layout<TtfMathFont>,
-) {
-    // let (x0, y0, x1, y1) = renderer.size(&node);
-    context.0.save();
-    let Metrics { bbox, .. } = formula_metrics;
-    if let Some(canvas_size) = canvas_size {
-        scale_and_center(*bbox, context, canvas_size);
-    }
 
-    let renderer = Renderer::new();
-    renderer.render(&layout, context);
-
-
-    context.0.restore();
-}
 
 
 // fn draw_face(context: &web_sys::CanvasRenderingContext2d) {
