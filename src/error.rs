@@ -1,13 +1,16 @@
 use std::fmt::Display;
 
-use rex::error::{LayoutError, FontError};
-use rex::parser::error::ParseError;
+use rex::{error::{FontError, LayoutError}, parser::error::ParseError};
 use ttf_parser::FaceParsingError;
+
+
+
 
 #[derive(Debug,)]
 pub enum AppError {
     ParseError(String),
     IOError(std::io::Error),
+    #[cfg(not(target_arch = "wasm32"))]
     CairoError(cairo::Error),
     FontError(FontError),
     LayoutError(LayoutError),
@@ -16,6 +19,7 @@ pub enum AppError {
 
 impl Display for AppError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        #[allow(unreachable_patterns)]
         let error_tag = match self {
             AppError::FontError(_) |
             AppError::FaceParsingError(_) |
@@ -29,6 +33,7 @@ impl Display for AppError {
         let error_message = match self {
             AppError::ParseError(e)  => format!("{}", e),
             AppError::IOError(e)     => format!("{}", e),
+            #[cfg(not(target_arch = "wasm32"))]
             AppError::CairoError(e)  => format!("{}", e),
             AppError::FaceParsingError(e) => format!("{}", e),
             AppError::FontError(e)   |
@@ -46,6 +51,8 @@ impl From<std::io::Error> for AppError {
     { Self::IOError(err) }
 }
 
+
+#[cfg(not(target_arch = "wasm32"))]
 impl From<cairo::Error> for AppError {
     fn from(err: cairo::Error) -> Self 
     { Self::CairoError(err) }

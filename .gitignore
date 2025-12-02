@@ -1,3 +1,4 @@
+www/
 /target
 /maths-preview-web/target
 **/*.rs.bk

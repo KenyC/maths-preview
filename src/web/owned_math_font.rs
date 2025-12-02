@@ -3,7 +3,10 @@ use std::convert::TryInto;
 
 use owned_ttf_parser::{math::GlyphPart, LazyArray16,OutlineBuilder};
 
-use rex::{font::{Constants, VariantGlyph, common::{GlyphInstruction, GlyphId}, Direction, Glyph}, dimensions::{Scale, Font, Em, Length}, error::FontError};
+
+use rex::{font::{FontConstants, VariantGlyph, common::{GlyphInstruction, GlyphId}, Direction, Glyph}, error::FontError, dimensions::units::Ratio};
+use rex::dimensions::Unit;
+use rex::dimensions::units::{Em, FUnit};
 
 
 
@@ -79,13 +82,13 @@ impl<'a, 'b> TtfMathFont<'a, 'b> {
         Some(value)
     }
 
-    fn safe_constants(&self, font_units_to_em : Scale<Em, Font>) -> Option<Constants> {
+    fn safe_constants(&self, font_units_to_em : Unit<Ratio<Em, FUnit>>) -> Option<FontConstants> {
         // perhaps cache : GlyphInfo table
         let math_constants = self.math.constants?;
-        let em = |v: f64| -> Length<Em> { Length::<Font>::new(v) * font_units_to_em };
+        let em = |v: f64| -> Unit<Em> { Unit::<FUnit>::new(v) * font_units_to_em };
 
 
-        Some(Constants {
+        Some(FontConstants {
             subscript_shift_down:        em(math_constants.subscript_top_max().value.into()),
             subscript_top_max:           em(math_constants.subscript_top_max().value.into()),
             subscript_baseline_drop_min: em(math_constants.subscript_baseline_drop_min().value.into()),
@@ -130,9 +133,13 @@ impl<'a, 'b> TtfMathFont<'a, 'b> {
             stack_gap_min:                    em(math_constants.stack_gap_min().value.into()),
 
             delimiter_factor: 0.901,
-            delimiter_short_fall: Length::<Em>::new(0.1),
-            null_delimiter_space: Length::<Em>::new(0.1),
+            delimiter_short_fall: Unit::<Em>::new(0.1),
+            null_delimiter_space: Unit::<Em>::new(0.1),
 
+
+            underbar_vertical_gap:    em(math_constants.underbar_vertical_gap().value.into()),
+            underbar_rule_thickness:  em(math_constants.underbar_rule_thickness().value.into()),
+            underbar_extra_descender: em(math_constants.underbar_extra_descender().value.into()),
 
             script_percent_scale_down: 0.01 * f64::from(math_constants.script_percent_scale_down()),
             script_script_percent_scale_down: 0.01 * f64::from(math_constants.script_script_percent_scale_down()),
@@ -152,11 +159,11 @@ impl<'a, 'b> rex::font::MathFont for TtfMathFont<'a,'b> {
         self.safe_attachment(glyph_id).unwrap_or_default()
     }
 
-    fn constants(&self, font_units_to_em: Scale<Em, Font>) -> Constants {
+    fn constants(&self, font_units_to_em: Unit<Ratio<Em, FUnit>>) -> FontConstants {
         self.safe_constants(font_units_to_em).unwrap()
     }
 
-    fn horz_variant(&self, gid: GlyphId, width: rex::dimensions::Length<Font>) -> rex::font::common::VariantGlyph {
+    fn horz_variant(&self, gid: GlyphId, width: rex::dimensions::Unit<FUnit>) -> rex::font::common::VariantGlyph {
         // NOTE: The following is an adaptation of the corresponding code in the crate "font"
         // NOTE: bizarrely, the code for horizontal variant is not isomorphic to the code for vertical variant ; here, I've simply adapted the vertical variant code
         // TODO: figure out why horiz_variant uses 'greatest_lower_bound' and vert_variant uses 'smallest_lowerè_bound'
@@ -174,7 +181,7 @@ impl<'a, 'b> rex::font::MathFont for TtfMathFont<'a,'b> {
 
         // Otherwise, check if any replacement glyphs are larger than the demanded size: we use them if they exist.
         for record in construction.variants {
-            if record.advance_measurement >= (width / Font) as u16 {
+            if record.advance_measurement >= (width.unitless(FUnit)) as u16 {
                 return VariantGlyph::Replacement(from(record.variant_glyph));
             }
         }
@@ -191,14 +198,14 @@ impl<'a, 'b> rex::font::MathFont for TtfMathFont<'a,'b> {
             Some(ref assembly) => assembly,
         };
 
-        let size = (width / Font).ceil() as u32;
+        let size = (width.unitless(FUnit)).ceil() as u32;
 
         let instructions = construct_glyphs(variants.min_connector_overlap.into(), assembly.parts, size);
         VariantGlyph::Constructable(Direction::Horizontal, instructions)
     }
 
 
-    fn vert_variant(&self, gid: GlyphId, height: rex::dimensions::Length<Font>) -> rex::font::common::VariantGlyph {
+    fn vert_variant(&self, gid: GlyphId, height: rex::dimensions::Unit<FUnit>) -> rex::font::common::VariantGlyph {
         // NOTE: The following is an adaptation of the corresponding code in the crate "font"
 
         let variants = match self.math.variants {
@@ -215,7 +222,7 @@ impl<'a, 'b> rex::font::MathFont for TtfMathFont<'a,'b> {
 
         // Otherwise, check if any replacement glyphs are larger than the demanded size: we use them if they exist.
         for record in construction.variants {
-            if record.advance_measurement >= (height / Font) as u16 {
+            if record.advance_measurement >= (height.unitless(FUnit)) as u16 {
                 return VariantGlyph::Replacement(from(record.variant_glyph));
             }
         }
@@ -232,7 +239,7 @@ impl<'a, 'b> rex::font::MathFont for TtfMathFont<'a,'b> {
             Some(ref assembly) => assembly,
         };
 
-        let size = (height / Font).ceil() as u32;
+        let size = (height.unitless(FUnit)).ceil() as u32;
 
         // We aim for a construction where overlap between adjacent segment is the same
         // We take inspiration from [https://frederic-wang.fr/opentype-math-in-harfbuzz.html]
@@ -257,20 +264,20 @@ impl<'a, 'b> rex::font::MathFont for TtfMathFont<'a,'b> {
             font: self,
             gid,
             bbox: (
-                Length::<Font>::new(bbox.x_min.into()), 
-                Length::<Font>::new(bbox.y_min.into()), 
-                Length::<Font>::new(bbox.x_max.into()), 
-                Length::<Font>::new(bbox.y_max.into()),
+                Unit::<FUnit>::new(bbox.x_min.into()), 
+                Unit::<FUnit>::new(bbox.y_min.into()), 
+                Unit::<FUnit>::new(bbox.x_max.into()), 
+                Unit::<FUnit>::new(bbox.y_max.into()),
             ),
-            advance:    Length::<Font>::new(advance.into()),
-            lsb:        Length::<Font>::new(lsb.into()),
-            italics:    Length::<Font>::new(italics.into()),
-            attachment: Length::<Font>::new(attachment.into()),
+            advance:    Unit::<FUnit>::new(advance.into()),
+            lsb:        Unit::<FUnit>::new(lsb.into()),
+            italics:    Unit::<FUnit>::new(italics.into()),
+            attachment: Unit::<FUnit>::new(attachment.into()),
 
         })
     }
 
-    fn kern_for(&self, glyph_id : GlyphId, height : Length<Font>, side : rex::font::kerning::Corner) -> Option<Length<Font>> {
+    fn kern_for(&self, glyph_id : GlyphId, height : Unit<FUnit>, side : rex::font::kerning::Corner) -> Option<Unit<FUnit>> {
         let record = self.math.glyph_info?.kern_infos?.get(into(glyph_id))?;
 
         let table = match side {
@@ -297,16 +304,16 @@ impl<'a, 'b> rex::font::MathFont for TtfMathFont<'a,'b> {
             let h    = table.height(i)?.value; 
             let kern = table.kern(i)?.value;   
 
-            if height < Length::<Font>::new(h.into()) {
-                return Some(Length::<Font>::new(kern.into()));
+            if height < Unit::<FUnit>::new(h.into()) {
+                return Some(Unit::<FUnit>::new(kern.into()));
             }
         }
 
-        Some(Length::<Font>::new(table.kern(count)?.value.into()))
+        Some(Unit::<FUnit>::new(table.kern(count)?.value.into()))
     }
 
-    fn font_units_to_em(&self) -> Scale<Em, Font> {
-        Scale::<Em, Font>::new(self.font_matrix.sx as f64)
+    fn font_units_to_em(&self) -> Unit<Ratio<Em, FUnit>> {
+        Unit::<Ratio<Em, FUnit>>::new(self.font_matrix.sx as f64)
     }
 
 
@@ -438,9 +445,9 @@ fn construct_glyphs(min_connector_overlap : u32, parts: LazyArray16<GlyphPart>, 
     instructions
 }
 
-struct OutlineBuilderCompatibilityLater<'a, T : rex_svg::OutlineBuilder>(& 'a mut T);
+struct OutlineBuilderCompatibilityLater<'a, T : crate::svg::OutlineBuilder>(& 'a mut T);
 
-impl<'a, T : rex_svg::OutlineBuilder> OutlineBuilder for OutlineBuilderCompatibilityLater<'a, T> {
+impl<'a, T : crate::svg::OutlineBuilder> OutlineBuilder for OutlineBuilderCompatibilityLater<'a, T> {
 
     fn move_to(&mut self, x: f32, y: f32) {
         self.0.move_to(x, y)
@@ -466,9 +473,9 @@ impl<'a, T : rex_svg::OutlineBuilder> OutlineBuilder for OutlineBuilderCompatibi
 }
 
 
-use rex_svg::GivesOutline;
+use crate::svg::GivesOutline;
 impl GivesOutline for TtfMathFont<'_, '_> {
-    fn outline_glyph(&self, glyph_id : GlyphId, builder : &mut impl rex_svg::OutlineBuilder) {
+    fn outline_glyph(&self, glyph_id : GlyphId, builder : &mut impl crate::svg::OutlineBuilder) {
         self.font().outline_glyph(into(glyph_id), &mut OutlineBuilderCompatibilityLater(builder));
     }
     fn font_scale(&self) -> (f32, f32) {

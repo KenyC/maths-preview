@@ -1,46 +1,62 @@
-use std::unimplemented;
-
 use rex::{Backend, font::common::GlyphId, GraphicsBackend, FontBackend};
 use owned_ttf_parser::OutlineBuilder;
 use web_sys::{CanvasRenderingContext2d, CanvasWindingRule, OffscreenCanvasRenderingContext2d};
 
-use crate::owned_math_font::{TtfMathFont, into};
+use crate::web::AppResult;
+use crate::render::RenderingView;
+use super::owned_math_font::{TtfMathFont, into};
 
 
 
-#[derive(Debug, Clone, Copy)]
-pub struct CanvasContext<'a>(pub &'a CanvasRenderingContext2d);
+#[derive(Debug, Clone)]
+pub struct CanvasContext<'a> {
+    pub rendering_context: &'a CanvasRenderingContext2d,
+    pub color_stack: Vec<rex::RGBA>,
+}
+
+impl<'a> CanvasContext<'a> {
+    pub fn new(rendering_context: &'a CanvasRenderingContext2d) -> Self {
+        Self {
+            rendering_context,
+            color_stack: Vec::new(),
+        }
+    }
+}
 
 
 impl<'a, 'b> Backend<TtfMathFont<'a, 'b>> for CanvasContext<'_> {}
 
 impl GraphicsBackend for CanvasContext<'_> {
     fn rule(&mut self, pos: rex::Cursor, width: f64, height: f64) {
-        let canvas = self.0;
+        let canvas = self.rendering_context;
 
         canvas.rect(pos.x, pos.y, width, height);
         canvas.fill();
     }
 
-    fn begin_color(&mut self, _color: rex::RGBA) {
-        unimplemented!()
+    fn begin_color(&mut self, color: rex::RGBA) {
+        self.color_stack.push(color);
     }
 
     fn end_color(&mut self) {
-        unimplemented!()
+        self.color_stack.pop();
     }
 }
 
 
 impl FontBackend<TtfMathFont<'_, '_>> for CanvasContext<'_> {
     fn symbol(&mut self, pos: rex::Cursor, gid: GlyphId, scale: f64, font: &TtfMathFont<'_, '_>) {
-        let canvas = self.0;
+        let canvas = self.rendering_context;
         
         canvas.save();
         canvas.translate(pos.x, pos.y).unwrap();
         canvas.scale(scale, -scale).unwrap();
         canvas.scale(font.font_matrix().sx.into(), font.font_matrix().sy.into(),).unwrap();
         canvas.begin_path();
+
+        if let Some(color) = self.color_stack.last() {
+            canvas.set_fill_style_str(&rgba_u8_to_hex_string(*color))
+        }
 
         struct Builder<'a> { 
             canvas : &'a CanvasRenderingContext2d,
@@ -90,36 +106,69 @@ impl FontBackend<TtfMathFont<'_, '_>> for CanvasContext<'_> {
     }
 }
 
+#[cfg(target_arch = "wasm32")]
+impl RenderingView for CanvasContext<'_> {
+    fn save(&mut self) -> AppResult<()> {
+        self.rendering_context.save();
+        Ok(())
+    }
+
+    fn restore(&mut self) -> AppResult<()> {
+        self.rendering_context.restore();
+        Ok(())
+    }
+
+    fn translate(&mut self, x : f64, y : f64) -> AppResult<()> {
+        self.rendering_context.translate(x, y);
+        Ok(())
+    }
+
+    fn scale(&mut self, sx : f64, sy : f64) -> AppResult<()> {
+        self.rendering_context.scale(sx, sy);
+        Ok(())
+    }
+}
 
 
+#[derive(Debug, Clone)]
+pub struct OffscreenCanvasContext<'a> {
+    pub rendering_context: &'a OffscreenCanvasRenderingContext2d,
+    pub color_stack: Vec<rex::RGBA>,
+}
 
-#[derive(Debug, Clone, Copy)]
-pub struct OffscreenCanvasContext<'a>(pub &'a OffscreenCanvasRenderingContext2d);
 
+impl<'a> OffscreenCanvasContext<'a> {
+    pub fn new(rendering_context: &'a OffscreenCanvasRenderingContext2d) -> Self {
+        Self {
+            rendering_context,
+            color_stack: Vec::new(),
+        }
+    }
+}
 
 impl<'a, 'b> Backend<TtfMathFont<'a, 'b>> for OffscreenCanvasContext<'_> {}
 
 impl GraphicsBackend for OffscreenCanvasContext<'_> {
     fn rule(&mut self, pos: rex::Cursor, width: f64, height: f64) {
-        let canvas = self.0;
+        let canvas = self.rendering_context;
 
         canvas.rect(pos.x, pos.y, width, height);
         canvas.fill();
     }
 
-    fn begin_color(&mut self, _color: rex::RGBA) {
-        unimplemented!()
+    fn begin_color(&mut self, color: rex::RGBA) {
+        self.color_stack.push(color);
     }
 
     fn end_color(&mut self) {
-        unimplemented!()
+        self.color_stack.pop();
     }
 }
 
 
 impl FontBackend<TtfMathFont<'_, '_>> for OffscreenCanvasContext<'_> {
     fn symbol(&mut self, pos: rex::Cursor, gid: GlyphId, scale: f64, font: &TtfMathFont<'_, '_>) {
-        let canvas = self.0;
+        let canvas = self.rendering_context;
         
         canvas.save();
         canvas.translate(pos.x, pos.y).unwrap();
@@ -127,6 +176,9 @@ impl FontBackend<TtfMathFont<'_, '_>> for OffscreenCanvasContext<'_> {
         canvas.scale(font.font_matrix().sx.into(), font.font_matrix().sy.into(),).unwrap();
         canvas.begin_path();
 
+        if let Some(color) = self.color_stack.last() {
+            canvas.set_fill_style_str(&rgba_u8_to_hex_string(*color))
+        }
         struct Builder<'a> { 
             canvas : &'a OffscreenCanvasRenderingContext2d,
         }
@@ -175,3 +227,7 @@ impl FontBackend<TtfMathFont<'_, '_>> for OffscreenCanvasContext<'_> {
     }
 }
 
+fn rgba_u8_to_hex_string(color : rex::RGBA) -> String {
+    let rex::RGBA(r,g,b,a,) = color;
+    format!("#{:02X}{:02X}{:02X}{:02X}", r, g, b, a)
+}

@@ -9,14 +9,15 @@ use gtk4::glib::clone;
 use gtk4::{DrawingArea, glib, Statusbar, Entry};
 use gtk4::{Application, ApplicationWindow};
 use rex::font::backend::ttf_parser::TtfMathFont;
+use rex::cairo::CairoBackend;
 
 
-use crate::cli::{EXAMPLE_FORMULA, UI_FONT_SIZE};
+use crate::desktop::cli::{EXAMPLE_FORMULA, UI_FONT_SIZE};
 use crate::render::draw_formula;
-use crate::undo::{UndoStack, get_selection};
+use crate::desktop::undo::{UndoStack, get_selection};
+use crate::desktop::app::{save_to_output, AppContext};
 
 
-use crate::{save_to_output, AppContext};
 
 
 struct Ui {
@@ -51,7 +52,17 @@ pub fn build_ui(app : &Application, font : TtfMathFont<'static>, app_context : A
         let width  = width   as f64;
         let height = height  as f64; 
 
-        let result = draw_formula(text.as_str(), context, font.clone(), UI_FONT_SIZE, Some((width, height)), custom_cmd.borrow().deref());
+        let mut backend = CairoBackend::new(context.clone());
+
+        let result = draw_formula(
+            text.as_str(), 
+            &mut backend, 
+            &font, 
+            UI_FONT_SIZE, 
+            Some((width, height)), 
+            custom_cmd.borrow().deref()
+        );
+
         match result {
             Ok(_)  => {
                 status_bar.pop(0);
@@ -65,7 +76,16 @@ pub fn build_ui(app : &Application, font : TtfMathFont<'static>, app_context : A
                 status_bar.show();
                 eprintln!("{}", error);
                 status_bar.push(0, &format!("{}", error));
-                draw_formula(last_ok_string.borrow().as_str(), context, font.clone(), UI_FONT_SIZE, Some((width, height)), custom_cmd.borrow().deref()).unwrap_or(());
+
+
+                draw_formula(
+                    last_ok_string.borrow().as_str(), 
+                    &mut backend, 
+                    font.as_ref(), 
+                    UI_FONT_SIZE, 
+                    Some((width, height)), 
+                    custom_cmd.borrow().deref()
+                ).unwrap_or(());
             },
         }
     }));
