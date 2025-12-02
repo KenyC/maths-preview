@@ -17,7 +17,7 @@ use serde_json;
 
 use crate::error::AppResult;
 use crate::desktop::cli::{Format, Output, DEFAULT_FONT, EXAMPLE_FORMULA, UI_FONT_SIZE};
-use crate::desktop::render::MetaInfo;
+use crate::render::MetaInfo;
 use crate::geometry::Metrics;
 use crate::error::AppError;
 use crate::geometry::BBox;
@@ -112,7 +112,7 @@ fn save_svg(path : &Output, formula : &str, font : Rc<TtfMathFont>, font_size : 
 
 
     // render_layout(&context, None, &formula_metrics, layout)?;
-    let mut svg = rex_svg::SvgContext::new();
+    let mut svg = crate::svg::SvgContext::new();
     if glyph_as_text {
         let mut char_set = HashSet::new();
         for node in nodes {

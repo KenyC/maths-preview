@@ -1,5 +1,5 @@
-use crate::GivesOutline;
-use crate::OutlineBuilder;
+use super::GivesOutline;
+use super::OutlineBuilder;
 use rex::font::common::GlyphId;
 use rex::font::backend::ttf_parser::TtfMathFont;
 

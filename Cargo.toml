@@ -17,10 +17,10 @@ path = "src/main.rs"
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 gtk4 = "0.10.2"
 cairo-rs = {version = "*", features=["svg"]}
-rex = {git = "https://github.com/KenyC/ReX", features = ["ttfparser-fontparser", "cairo-renderer"], rev = "37a0b47177f24f124513894ed11b0faa328716b8"}
+rex = {git = "https://github.com/KenyC/ReX", features = ["ttfparser-fontparser", "cairo-renderer"], rev = "a779adebe63e70ef3b078090373c3af23c8b1083"}
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-rex = {git = "https://github.com/KenyC/ReX", features = [], rev = "37a0b47177f24f124513894ed11b0faa328716b8"}
+rex = {git = "https://github.com/KenyC/ReX", features = [], rev = "a779adebe63e70ef3b078090373c3af23c8b1083"}
 web-sys = {version = "*", features = [
 	'Document',
 	'Element',
@@ -47,5 +47,4 @@ js-sys = "0.3.64"
 ttf-parser = "*"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-rex-svg = { path = "deps/rex-svg/", features=["ttf-parser"] }
 utf16string = "0.2.0"

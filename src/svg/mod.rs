@@ -1,7 +1,6 @@
 use rex::{font::common::GlyphId, Backend, Cursor, FontBackend, GraphicsBackend};
 use std::collections::HashMap;
 
-#[cfg(feature = "ttf-parser")]
 pub mod ttfparser;
 
 struct TextAsText {

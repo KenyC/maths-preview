@@ -1,45 +1,58 @@
 use std::rc::Rc;
 
-use cairo::Context;
-use rex::{font::{backend::ttf_parser::TtfMathFont, MathFont}, layout::engine::{LayoutBuilder}, parser::{macros::CommandCollection, parse_with_custom_commands}, Renderer};
+// use cairo::Context;
+use rex::{cairo::CairoBackend, font::{backend::ttf_parser::TtfMathFont, MathFont}, layout::engine::LayoutBuilder, parser::{macros::CommandCollection, parse_with_custom_commands}, Renderer};
 use serde::Serialize;
 
 use crate::{geometry::{Metrics, BBox}, error::{AppResult, AppError}};
 
+pub trait RenderingView {
+    fn save(&mut self) -> AppResult<()>;
+    fn restore(&mut self) -> AppResult<()>;
+    fn translate(&mut self, x : f64, y : f64) -> AppResult<()>;
+    fn scale(&mut self, sx : f64, sy : f64) -> AppResult<()>;
+}
 
-
-pub fn draw_formula<'a>(
+pub fn draw_formula<'a, F, B>(
     formula : &str, 
-    context: &Context, 
-    font : Rc<TtfMathFont<'a>>, 
+    context: &mut B, 
+    // font : Rc<TtfMathFont<'a>>, 
+    font : &F, 
     font_size : f64, 
     canvas_size : Option<(f64, f64)>,
     custom_cmd : &CommandCollection,
-) -> AppResult<()> {
-    let (layout, formula_metrics) = layout_and_size(font.as_ref(), font_size, formula, custom_cmd,)?;
+) -> AppResult<()> 
+where 
+    F : MathFont,
+    B : RenderingView + rex::Backend<F>,
+{
+    let (layout, formula_metrics) = layout_and_size(font, font_size, formula, custom_cmd,)?;
     render_layout(context, canvas_size, &formula_metrics, layout)
 }
 
-pub fn render_layout(
-    context: &Context, 
+pub fn render_layout<B, F>(
+    backend: &mut B, 
     canvas_size: Option<(f64, f64)>, 
     formula_metrics: &Metrics, 
-    layout: rex::layout::Layout<TtfMathFont>,
-) -> AppResult<()> {
+    layout: rex::layout::Layout<F>,
+) -> AppResult<()> 
+where 
+    F : MathFont,
+    B : RenderingView + rex::Backend<F>,
+{
     // let (x0, y0, x1, y1) = renderer.size(&node);
-    context.save()?;
+    backend.save()?;
     let Metrics { bbox, .. } = formula_metrics;
     if let Some(canvas_size) = canvas_size {
-        scale_and_center(*bbox, context, canvas_size);
+        scale_and_center(*bbox, backend, canvas_size);
     }
 
-    let mut backend = rex::render::cairo::CairoBackend::new(context.clone());
     let renderer = Renderer::new();
-    renderer.render(&layout, &mut backend);
+    renderer.render(&layout, backend);
 
 
 
-    context.restore()?;
+    backend.restore()?;
     Ok(())
 }
 
@@ -75,7 +88,9 @@ pub fn layout_and_size<'f, T : MathFont>(font: &'f T, font_size : f64, formula: 
     Ok((layout, metrics))
 }
 
-pub fn scale_and_center(bbox: BBox, context: &Context, canvas_size: (f64, f64)) {
+pub fn scale_and_center<C>(bbox: BBox, context: &mut C, canvas_size: (f64, f64)) 
+where C : RenderingView
+{
     let width   = bbox.width();
     let height  = bbox.height();
     if width <= 0. || height < 0. {return;}
@@ -95,23 +110,47 @@ pub fn scale_and_center(bbox: BBox, context: &Context, canvas_size: (f64, f64)) 
     let tx = - (midx - 0.5 *  canvas_width / scale);
     let ty = - (midy - 0.5 *  canvas_height / scale);
     // draw_bbox(context, 0., 0., canvas_width, canvas_height, 10., 10.);
+
+    // TODO deal with errors that might occur here
     context.scale(scale, scale);
     context.translate(tx, ty);
 
 }
 
-#[allow(unused)]
-pub fn draw_bbox(context: &Context, x0: f64, y0: f64, width: f64, height: f64, x1: f64, y1: f64) {
-    context.set_source_rgb(1., 0., 0.);
-    context.rectangle(x0, y0, width, height);
-    context.stroke().unwrap();
+impl RenderingView for CairoBackend {
+    fn save(&mut self) -> AppResult<()> {
+        self.context_ref().save()?;
+        Ok(())
+    }
 
-    context.set_source_rgb(0., 1., 0.);
-    const WIDTH_POINT : f64 = 5.;
-    context.rectangle(x0 - WIDTH_POINT * 0.5, y0 - WIDTH_POINT * 0.5, WIDTH_POINT, WIDTH_POINT);
-    context.fill().unwrap();
+    fn restore(&mut self) -> AppResult<()> {
+        self.context_ref().restore()?;
+        Ok(())
+    }
 
-    context.set_source_rgb(0., 1., 0.);
-    context.rectangle(x1 - WIDTH_POINT * 0.5, y1 - WIDTH_POINT * 0.5, WIDTH_POINT, WIDTH_POINT);
-    context.fill().unwrap();
+    fn translate(&mut self, x : f64, y : f64) -> AppResult<()> {
+        self.context_ref().translate(x, y);
+        Ok(())
+    }
+
+    fn scale(&mut self, sx : f64, sy : f64) -> AppResult<()> {
+        self.context_ref().scale(sx, sy);
+        Ok(())
+    }
 }
+
+// #[allow(unused)]
+// pub fn draw_bbox<C: RenderingView>(context: &mut C, x0: f64, y0: f64, width: f64, height: f64, x1: f64, y1: f64) {
+//     context.set_source_rgb(1., 0., 0.);
+//     context.rectangle(x0, y0, width, height);
+//     context.stroke().unwrap();
+
+//     context.set_source_rgb(0., 1., 0.);
+//     const WIDTH_POINT : f64 = 5.;
+//     context.rectangle(x0 - WIDTH_POINT * 0.5, y0 - WIDTH_POINT * 0.5, WIDTH_POINT, WIDTH_POINT);
+//     context.fill().unwrap();
+
+//     context.set_source_rgb(0., 1., 0.);
+//     context.rectangle(x1 - WIDTH_POINT * 0.5, y1 - WIDTH_POINT * 0.5, WIDTH_POINT, WIDTH_POINT);
+//     context.fill().unwrap();
+// }
