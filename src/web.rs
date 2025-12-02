@@ -11,7 +11,7 @@ use wasm_bindgen::prelude::*;
 use owned_ttf_parser::{OwnedFace, AsFaceRef};
 use crate::error::{AppError, AppResult};
 
-use rex_svg::SvgContext;
+use crate::svg::SvgContext;
 
 // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global
 // allocator.

@@ -1,7 +1,8 @@
-use std::rc::Rc;
 
 // use cairo::Context;
-use rex::{cairo::CairoBackend, font::{backend::ttf_parser::TtfMathFont, MathFont}, layout::engine::LayoutBuilder, parser::{macros::CommandCollection, parse_with_custom_commands}, Renderer};
+#[cfg(not(target_arch = "wasm32"))]
+use rex::cairo::CairoBackend;
+use rex::{font::MathFont, layout::engine::LayoutBuilder, parser::{macros::CommandCollection, parse_with_custom_commands}, Renderer};
 use serde::Serialize;
 
 use crate::{geometry::{Metrics, BBox}, error::{AppResult, AppError}};
@@ -117,6 +118,7 @@ where C : RenderingView
 
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 impl RenderingView for CairoBackend {
     fn save(&mut self) -> AppResult<()> {
         self.context_ref().save()?;

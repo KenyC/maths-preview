@@ -445,9 +445,9 @@ fn construct_glyphs(min_connector_overlap : u32, parts: LazyArray16<GlyphPart>, 
     instructions
 }
 
-struct OutlineBuilderCompatibilityLater<'a, T : rex_svg::OutlineBuilder>(& 'a mut T);
+struct OutlineBuilderCompatibilityLater<'a, T : crate::svg::OutlineBuilder>(& 'a mut T);
 
-impl<'a, T : rex_svg::OutlineBuilder> OutlineBuilder for OutlineBuilderCompatibilityLater<'a, T> {
+impl<'a, T : crate::svg::OutlineBuilder> OutlineBuilder for OutlineBuilderCompatibilityLater<'a, T> {
 
     fn move_to(&mut self, x: f32, y: f32) {
         self.0.move_to(x, y)
@@ -473,9 +473,9 @@ impl<'a, T : rex_svg::OutlineBuilder> OutlineBuilder for OutlineBuilderCompatibi
 }
 
 
-use rex_svg::GivesOutline;
+use crate::svg::GivesOutline;
 impl GivesOutline for TtfMathFont<'_, '_> {
-    fn outline_glyph(&self, glyph_id : GlyphId, builder : &mut impl rex_svg::OutlineBuilder) {
+    fn outline_glyph(&self, glyph_id : GlyphId, builder : &mut impl crate::svg::OutlineBuilder) {
         self.font().outline_glyph(into(glyph_id), &mut OutlineBuilderCompatibilityLater(builder));
     }
     fn font_scale(&self) -> (f32, f32) {
