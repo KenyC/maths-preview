@@ -11,7 +11,9 @@ use wasm_bindgen::prelude::*;
 use owned_ttf_parser::{OwnedFace, AsFaceRef};
 use crate::error::{AppError, AppResult};
 
+use crate::geometry::{BBox, Metrics};
 use crate::svg::SvgContext;
+use crate::render::scale_and_center;
 
 // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global
 // allocator.
@@ -166,6 +168,7 @@ fn layout_and_size<'a, 'f, 'b>(font: &'f TtfMathFont<'a, 'b>, font_size : f64, f
 
     // Create metrics
     let metrics = Metrics {
+        font_size,
         bbox: BBox::from_typographic(0., formula_bbox.depth, formula_bbox.width, formula_bbox.height,),
         baseline: formula_bbox.depth,
     };
@@ -173,30 +176,6 @@ fn layout_and_size<'a, 'f, 'b>(font: &'f TtfMathFont<'a, 'b>, font_size : f64, f
     Ok((layout, metrics))
 }
 
-fn scale_and_center(bbox: BBox, context: &CanvasContext, canvas_size: (f64, f64)) {
-    let width   = bbox.width();
-    let height  = bbox.height();
-    if width <= 0. || height < 0. {return;}
-    let (canvas_width, canvas_height) = canvas_size;
-    let BBox { x_min, y_min, x_max, y_max } = bbox;
-    let midx = 0.5 * (x_min + x_max);
-    let midy = 0.5 * (y_min + y_max);
-
-    let fit_to_width  = canvas_width / width;
-    let fit_to_height = canvas_height / height;
-    let optimal_scale = f64::min(fit_to_width, fit_to_height);
-    // we don't want the scale to keep changing as we type
-    // we only zoom out when the formula gets out of bound and we scale conservatively.
-    const FACTOR_INCREMENT : f64 = 0.65;
-    let scale = FACTOR_INCREMENT.powf((optimal_scale).log(FACTOR_INCREMENT).ceil());
-
-    let tx = - (midx - 0.5 *  canvas_width / scale);
-    let ty = - (midy - 0.5 *  canvas_height / scale);
-    // draw_bbox(context, 0., 0., canvas_width, canvas_height, 10., 10.);
-    context.0.scale(scale, scale).unwrap();
-    context.0.translate(tx, ty).unwrap();
-
-}
 
 fn render_layout(
     context: &mut CanvasContext, 
@@ -249,37 +228,3 @@ fn render_layout(
 
 
 
-#[derive(Debug,)]
-struct Metrics {
-    bbox      : BBox,
-    baseline  : f64,
-}
-
-#[derive(Debug, Clone, Copy)]
-struct BBox {
-    x_min  : f64,
-    y_min  : f64,
-    x_max  : f64,
-    y_max  : f64,
-}
-
-impl BBox {
-    #[allow(unused)]
-    fn new(x_min: f64, y_min: f64, x_max: f64, y_max: f64) -> Self { Self { x_min, y_min, x_max, y_max } }
-
-    #[inline]
-    fn width(&self) -> f64 { self.x_max - self.x_min }
-
-    #[inline]
-    fn height(&self) -> f64 { self.y_max - self.y_min }
-
-    /// This assumes the baseline is at y = 0
-    pub fn from_typographic(x_min: f64, depth: f64, x_max: f64, height: f64) -> Self { 
-        // height is signed distance from baseline to top of the glyph's bounding box
-        // height > 0 means that top of bouding box is above baseline (i.e. y_min)
-        // above in the screen's coordinate system means Y < 0
-        // So y_min = - height
-        // Similar reasoning for depth
-        Self { x_min, y_min : -height, x_max, y_max : -depth } 
-    }
-}

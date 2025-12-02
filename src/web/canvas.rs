@@ -4,6 +4,8 @@ use rex::{Backend, font::common::GlyphId, GraphicsBackend, FontBackend};
 use owned_ttf_parser::OutlineBuilder;
 use web_sys::{CanvasRenderingContext2d, CanvasWindingRule, OffscreenCanvasRenderingContext2d};
 
+use crate::web::AppResult;
+use crate::render::RenderingView;
 use super::owned_math_font::{TtfMathFont, into};
 
 
@@ -90,7 +92,28 @@ impl FontBackend<TtfMathFont<'_, '_>> for CanvasContext<'_> {
     }
 }
 
+#[cfg(target_arch = "wasm32")]
+impl RenderingView for CanvasContext<'_> {
+    fn save(&mut self) -> AppResult<()> {
+        self.0.save();
+        Ok(())
+    }
 
+    fn restore(&mut self) -> AppResult<()> {
+        self.0.restore();
+        Ok(())
+    }
+
+    fn translate(&mut self, x : f64, y : f64) -> AppResult<()> {
+        self.0.translate(x, y);
+        Ok(())
+    }
+
+    fn scale(&mut self, sx : f64, sy : f64) -> AppResult<()> {
+        self.0.scale(sx, sy);
+        Ok(())
+    }
+}
 
 
 #[derive(Debug, Clone, Copy)]
