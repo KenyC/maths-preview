@@ -3,7 +3,7 @@ import init, {
 	render_formula_to_canvas_js_err,
 	render_formula_to_offscreen_canvas_js_err,
 	render_formula_to_svg 
-} from './maths_preview_web.js';
+} from './maths_preview.js';
 
 let previously_working_formula = "";
 let canvas;

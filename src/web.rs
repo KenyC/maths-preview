@@ -6,7 +6,7 @@ mod owned_math_font;
 
 use canvas::{CanvasContext, OffscreenCanvasContext};
 use owned_math_font::TtfMathFont;
-use rex::{font::{FontContext}, parser::parse, layout::{engine::layout}, Renderer};
+use rex::{parser::parse, layout::engine::LayoutBuilder, Renderer};
 use web_sys::{CanvasRenderingContext2d, OffscreenCanvasRenderingContext2d,};
 use wasm_bindgen::prelude::*;
 use owned_ttf_parser::{OwnedFace, AsFaceRef};
@@ -140,7 +140,8 @@ fn render_formula_to_canvas(
     let canvas_size = get_canvas_size(context);
     context.0.clear_rect(0., 0., canvas_size.0, canvas_size.1);
     let (layout, formula_metrics) = layout_and_size(&math_font, FONT_SIZE, formula,)?;
-    render_layout(&mut context, Some(canvas_size), &formula_metrics, layout)
+    render_layout(&mut context, Some(canvas_size), &formula_metrics, layout);
+    Ok(())
 }
 
 fn get_canvas_size(context: CanvasContext) -> (f64, f64) {
@@ -155,9 +156,12 @@ fn layout_and_size<'a, 'f, 'b>(font: &'f TtfMathFont<'a, 'b>, font_size : f64, f
     let parse_node = parse(formula).map_err(|e| AppError::ParseError(format!("{}", e)))?;
 
     // Create node
-    let font_context = FontContext::new(font)?;
-    let layout_settings = rex::layout::LayoutSettings::new(&font_context, font_size, rex::layout::Style::Display);
-    let layout = layout(&parse_node, layout_settings)?;
+    let layout = 
+        LayoutBuilder::new(font)
+        .font_size(font_size)
+        .build()
+        .layout(&parse_node)?
+    ;
 
     let formula_bbox = layout.size();
 

@@ -4,7 +4,7 @@ use rex::{Backend, font::common::GlyphId, GraphicsBackend, FontBackend};
 use owned_ttf_parser::OutlineBuilder;
 use web_sys::{CanvasRenderingContext2d, CanvasWindingRule, OffscreenCanvasRenderingContext2d};
 
-use crate::owned_math_font::{TtfMathFont, into};
+use super::owned_math_font::{TtfMathFont, into};
 
 
 
