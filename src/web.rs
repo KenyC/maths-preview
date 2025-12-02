@@ -1,4 +1,3 @@
-mod error;
 mod canvas;
 mod owned_math_font;
 
@@ -10,7 +9,7 @@ use rex::{parser::parse, layout::engine::LayoutBuilder, Renderer};
 use web_sys::{CanvasRenderingContext2d, OffscreenCanvasRenderingContext2d,};
 use wasm_bindgen::prelude::*;
 use owned_ttf_parser::{OwnedFace, AsFaceRef};
-use error::{AppError, AppResult};
+use crate::error::{AppError, AppResult};
 
 use rex_svg::SvgContext;
 
@@ -58,9 +57,9 @@ pub fn render_formula_to_offscreen_canvas_js_err(
     // since we can't know what size the formula will be prior to calling 'layout'
     // the canvas is created by a JS function which takes two arguments
     make_new_canvas : &js_sys::Function,
-) -> Result<(), JsValue> {
+) -> Result<(), String> {
     render_formula_to_offscreen_canvas(context, formula, make_new_canvas).map_err(|e| {
-        JsValue::from_str(&e.human_readable())
+        e.to_string()
     })
 }
 
@@ -99,9 +98,9 @@ pub fn render_formula_to_canvas_js_err(
     context : &Context,
     formula : &str, 
     canvas  : &CanvasRenderingContext2d
-) -> Result<(), JsValue> {
+) -> Result<(), String> {
     render_formula_to_canvas(context, formula, canvas).map_err(|e| {
-        JsValue::from_str(&e.human_readable())
+        e.to_string()
     })
 }
 

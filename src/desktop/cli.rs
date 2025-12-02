@@ -9,7 +9,7 @@ use gtk4::Application;
 
 
 
-use crate::desktop::error::AppResult;
+use crate::error::AppResult;
 use crate::desktop::app::AppContext;
 
 

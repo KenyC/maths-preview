@@ -4,7 +4,7 @@ use cairo::Context;
 use rex::{font::{backend::ttf_parser::TtfMathFont, MathFont}, layout::engine::{LayoutBuilder}, parser::{macros::CommandCollection, parse_with_custom_commands}, Renderer};
 use serde::Serialize;
 
-use crate::{geometry::{Metrics, BBox}, desktop::error::{AppResult, AppError}};
+use crate::{geometry::{Metrics, BBox}, error::{AppResult, AppError}};
 
 
 

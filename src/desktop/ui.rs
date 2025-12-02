@@ -14,9 +14,9 @@ use rex::font::backend::ttf_parser::TtfMathFont;
 use crate::desktop::cli::{EXAMPLE_FORMULA, UI_FONT_SIZE};
 use crate::desktop::render::draw_formula;
 use crate::desktop::undo::{UndoStack, get_selection};
-
-
 use crate::desktop::app::{save_to_output, AppContext};
+
+
 
 
 struct Ui {
