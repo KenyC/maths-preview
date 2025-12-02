@@ -89,7 +89,7 @@ fn render_formula_to_offscreen_canvas(
 
     canvas_context.translate(0., height + formula_metrics.baseline).unwrap();
 
-    let mut context = OffscreenCanvasContext(&canvas_context);
+    let mut context = OffscreenCanvasContext::new(&canvas_context);
     Renderer::new().render(&layout, &mut context);
 
 
@@ -138,17 +138,17 @@ fn render_formula_to_canvas(
 ) -> AppResult<()> {
     let font = context.as_ref();
     let math_font  = TtfMathFont::new(font.as_face_ref()).unwrap();
-    let mut context = CanvasContext(canvas);
-    let canvas_size = get_canvas_size(context);
-    context.0.clear_rect(0., 0., canvas_size.0, canvas_size.1);
+    let mut context = CanvasContext::new(canvas);
+    let canvas_size = get_canvas_size(&context);
+    context.rendering_context.clear_rect(0., 0., canvas_size.0, canvas_size.1);
     let (layout, formula_metrics) = layout_and_size(&math_font, FONT_SIZE, formula, &CommandCollection::default())?;
     render_layout(&mut context, Some(canvas_size), &formula_metrics, layout);
     Ok(())
 }
 
-fn get_canvas_size(context: CanvasContext) -> (f64, f64) {
-    let width  = context.0.canvas().unwrap().width() as f64;
-    let height = context.0.canvas().unwrap().height() as f64;
+fn get_canvas_size(context: &CanvasContext) -> (f64, f64) {
+    let width  = context.rendering_context.canvas().unwrap().width() as f64;
+    let height = context.rendering_context.canvas().unwrap().height() as f64;
     let canvas_size = (width, height,);
     canvas_size
 }
