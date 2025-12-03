@@ -10,3 +10,8 @@ web:
 	cargo build --lib --target wasm32-unknown-unknown
 	wasm-bindgen ${WASM_TARGET_DIR}/wasm32-unknown-unknown/debug/maths_preview.wasm --out-dir www/ --target web
 	cp -f src/web/static/* www/
+
+
+prepare:
+	rustup default stable
+	rustup target add wasm32-unknown-unknown
