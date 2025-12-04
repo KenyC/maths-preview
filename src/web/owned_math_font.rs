@@ -484,3 +484,26 @@ impl GivesOutline for TtfMathFont<'_, '_> {
     }
 }
 
+use crate::render::GlyphAsTextUtilities;
+impl GlyphAsTextUtilities for TtfMathFont<'_, '_> {
+    fn glyph_index_for_char(&self, character: char) -> Option<GlyphId> {
+        self.font().glyph_index(character).map(from)
+    }
+
+    fn get_font_family_name(&self) -> Option<String> {
+        let table = self.font().tables().name?.names;
+
+        for name in table {
+            // Cf https://learn.microsoft.com/en-us/typography/opentype/spec/name for meaning of id's
+            // This gets font-family name
+            // TODO take into account language & platform ID 
+            if name.name_id == 1 {
+                if let Ok(to_return) = utf16string::WStr::from_utf16be(name.name) {
+                    return Some(to_return.to_utf8());
+                }
+            }
+        }
+
+        None
+    }
+}

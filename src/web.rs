@@ -14,7 +14,7 @@ use crate::error::{AppError, AppResult};
 
 use crate::geometry::{BBox, Metrics};
 use crate::svg::SvgContext;
-use crate::render::{scale_and_center, layout_and_size, render_layout};
+use crate::render::{render_svg, scale_and_center, layout_and_size, render_layout};
 
 // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global
 // allocator.
@@ -112,22 +112,21 @@ pub fn render_formula_to_canvas_js_err(
 pub fn render_formula_to_svg(
     context : &Context,
     formula : &str, 
-) -> String {
+) -> Result<String, String> {
     let font = context.as_ref();
     let math_font  = TtfMathFont::new(font.as_face_ref()).unwrap();
 
-    let (layout, formula_metrics) = layout_and_size(&math_font, FONT_SIZE, formula, &CommandCollection::default()).unwrap();
-    let mut svg_context = SvgContext::new();
-    let renderer = Renderer::new();
-
-    renderer.render(&layout, &mut svg_context);
-
-    let height = formula_metrics.bbox.height();
-    let width = formula_metrics.bbox.width();
-    svg_context.finalize(
-        0., - height - formula_metrics.baseline,
-        width, height,
-    )
+    let svg_render_result = render_svg(
+        formula,
+        &math_font,
+        FONT_SIZE,
+        &CommandCollection::default(),
+        false,
+    );
+    match svg_render_result {
+        Ok((_, svg_string)) => Ok(svg_string),
+        Err(e) => Err(e.to_string()),
+    }
 }
 
 
