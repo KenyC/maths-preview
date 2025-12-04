@@ -140,7 +140,7 @@ pub fn render_formula_to_svg(
     context : &Context,
     formula : &str, 
 ) -> Result<String, String> {
-    let font = context.as_ref();
+    let font = context.font();
     let math_font  = TtfMathFont::new(font.as_face_ref()).unwrap();
 
     let svg_render_result = render_svg(
@@ -162,7 +162,7 @@ fn render_formula_to_canvas(
     formula : &str, 
     canvas  : &CanvasRenderingContext2d
 ) -> AppResult<()> {
-    let font = context.as_ref();
+    let font = context.font();
     let math_font  = TtfMathFont::new(font.as_face_ref()).unwrap();
     let mut context = CanvasContext::new(canvas);
     let canvas_size = get_canvas_size(&context);
