@@ -32,15 +32,42 @@ const FONT_FILE : &[u8] = include_bytes!("../resources/LibertinusMath-Regular.ot
 #[wasm_bindgen]
 pub struct Context {
     face : *const OwnedFace,
+    glyph_as_text: bool,
+    font_size: f64,
 }
 
 impl Context {
-    pub fn as_ref<'a>(& 'a self) -> & 'a OwnedFace {
+    pub fn font<'a>(& 'a self) -> & 'a OwnedFace {
         unsafe { self.face.as_ref::<'a>().unwrap() }
     }
 
     pub fn new(value : Box<OwnedFace>) -> Self {
-        Self { face: Box::leak(value) }
+        Self { face: Box::leak(value), font_size: FONT_SIZE, glyph_as_text: false, }
+    }
+}
+
+#[wasm_bindgen]
+impl Context {
+    pub fn set_settings_from_js(
+        &mut self,
+        glyph_as_text: bool,
+        font_size: &str,
+    ) {
+        self.glyph_as_text = glyph_as_text;
+
+        if let Ok(value) = font_size.parse() {
+            self.font_size = value;
+        }
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn glyph_as_text(&self) -> bool {
+        self.glyph_as_text
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn font_size(&self) -> f64 {
+        self.font_size
     }
 }
 
@@ -72,7 +99,7 @@ fn render_formula_to_offscreen_canvas(
     canvas_with_size : &js_sys::Function,
 )  -> Result<(), AppError> {
     const PNG_FONT_SIZE : f64 = 300.;
-    let font = context.as_ref();
+    let font = context.font();
     let math_font  = TtfMathFont::new(font.as_face_ref()).unwrap();
 
     let (layout, formula_metrics) = layout_and_size(&math_font, PNG_FONT_SIZE, formula, &CommandCollection::default())?;
@@ -119,9 +146,9 @@ pub fn render_formula_to_svg(
     let svg_render_result = render_svg(
         formula,
         &math_font,
-        FONT_SIZE,
+        context.font_size,
         &CommandCollection::default(),
-        false,
+        context.glyph_as_text,
     );
     match svg_render_result {
         Ok((_, svg_string)) => Ok(svg_string),

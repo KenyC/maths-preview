@@ -6,6 +6,17 @@
 		<link rel="stylesheet" type="text/css" href="./style.css">
 	</head>
 	<body>
+		<dialog id="export_options_dialog" closedby="any">
+			<h2>SVG export options</h2>
+			<form id="settings_form">
+				<label for="glyph_as_text">Glyph as text:</label>
+				<input type="checkbox" name="glyph_as_text" id="glyph_as_text">
+				<br>
+				<label for="font_size">Font size (in pt . em<sup>-1</sup>):</label>
+				<input type="number" name="font_size" id="font_size" min="1" max="100">
+			</form>
+			<button id="close_dialog" autofocus>Close</button>
+		</dialog>
 		<input type="text" id="formula" value="e^{i\pi}+1=0">
 		<canvas id="canvas"></canvas>
 		<div id="error"></div>
@@ -15,6 +26,7 @@
 				<option value="png">.png</option>
 			</select><br>
 			<button type="button" id="save">Save</button>
+			<a id="export_options_link">Export Options...</a>
 		</div>
 	</body>
 </html>
